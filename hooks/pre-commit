@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+./format.sh
+
+format_result=$(git ls-files -m)
+staged_files=$(git diff --name-only --cached)
+
+IFS=$'\n'
+set -f
+intersection=($(comm -12 <(
+    printf '%s\n' "${format_result[@]}" | sort
+) <(
+    printf '%s\n' "${staged_files[@]}" | sort
+)))
+
+if [ -z "${intersection}" ]; then
+    echo "Passed format."
+else
+    echo "Failed format due to ${intersection}."
+    exit 1
+fi
+
+./lint.sh
+lint_result=$(./lint.sh)
+
+if [[ "${lint_result}" == "Running lint.sh...
+Running flake8...
+Running mypy...
+Success: no issues found in "*" source files
+Running pylint...
+Done." ]]; then
+    echo "Passed lint."
+else
+    echo "Failed lint due to ${lint_result}."
+    exit 1
+fi

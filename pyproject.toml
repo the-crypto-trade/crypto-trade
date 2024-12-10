@@ -1,0 +1,33 @@
+[project]
+name = "crypto-trade"
+dynamic = ["version"]
+dependencies = [
+    "aiohttp[speedups] ~= 3.10",
+    "StrEnum ~= 0.4 ; python_version < '3.11'",
+]
+requires-python = ">= 3.10"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+[project.urls]
+Repository = "https://github.com/the-crypto-trade/crypto-trade.git"
+
+[build-system]
+requires = ["setuptools", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+    "StrEnum",
+    "black",
+    "isort",
+    "autoflake",
+    "flake8",
+    "mypy",
+    "pylint",
+    "pytest",
+    "uvloop ; platform_system != 'Windows'",
+    "orjson",
+]
+
+[tool.setuptools_scm]

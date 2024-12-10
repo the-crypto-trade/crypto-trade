@@ -1,0 +1,81 @@
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  semantic-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+
+      - name: Semantic release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx npm-check-updates -u
+          result=$(git ls-files -m)
+          if [ -z "${result}" ]; then
+              echo "Passed npm-check-updates."
+          else
+              echo "Failed npm-check-updates due to ${result}."
+              cat package.json
+              exit 1
+          fi
+          npm install
+          npm ci
+          npx semantic-release
+
+  build:
+    needs:
+      - semantic-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: "release"
+
+      - name: Git pull
+        run: |
+          git pull
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Build
+        run: |
+          python3 -m pip install build
+          python3 -m build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
