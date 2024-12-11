@@ -16,7 +16,7 @@ def json_serialize(data):
 async def main():
     try:
         symbol = "BTC-USDT"
-        okx = Okx(
+        exchange = Okx(
             instrument_type=OkxInstrumentType.SPOT,
             symbols={symbol},
             subscribe_bbo=True,
@@ -25,9 +25,9 @@ async def main():
             json_deserialize=orjson.loads,  # pylint: disable=maybe-no-member
         )
 
-        await okx.start()
+        await exchange.start()
 
-        await okx.stop()
+        await exchange.stop()
 
         asyncio.get_running_loop().stop()
 

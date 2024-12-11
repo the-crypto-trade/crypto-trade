@@ -10,7 +10,7 @@ async def main():
     try:
         symbol = "BTC-USDT"
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
-        okx = Okx(
+        exchange = Okx(
             instrument_type=OkxInstrumentType.SPOT,
             symbols={symbol},
             subscribe_bbo=True,
@@ -34,9 +34,9 @@ async def main():
             subscribe_balance=True,
         )
 
-        await okx.start()
+        await exchange.start()
 
-        await okx.stop()
+        await exchange.stop()
 
         asyncio.get_running_loop().stop()
 

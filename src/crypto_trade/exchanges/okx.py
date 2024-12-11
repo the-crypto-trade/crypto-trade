@@ -17,6 +17,7 @@ from crypto_trade.exchange_api import (
     Exchange,
     Fill,
     InstrumentInformation,
+    MarginType,
     Ohlcv,
     Order,
     OrderStatus,
@@ -165,17 +166,20 @@ class Okx(Exchange):
             json_serialize=self.json_serialize,
         )
 
-    def rest_account_cancel_order_create_rest_request_function(self, *, symbol, client_order_id):
+    def rest_account_cancel_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
         return self.rest_account_create_post_request_function_with_signature(
             path=self.rest_account_cancel_order_path,
-            json_payload=self.account_cancel_order_create_json_payload(symbol=symbol, client_order_id=client_order_id),
+            json_payload=self.account_cancel_order_create_json_payload(symbol=symbol, order_id=order_id, client_order_id=client_order_id),
             json_serialize=self.json_serialize,
         )
 
-    def rest_account_fetch_order_create_rest_request_function(self, *, symbol, client_order_id):
-        return self.rest_account_create_get_request_function_with_signature(
-            path=self.rest_account_fetch_order_path, query_params={"instId": symbol, "clOrdId": client_order_id}
-        )
+    def rest_account_fetch_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
+        query_params = {"instId": symbol}
+        if order_id:
+            query_params["ordId"] = order_id
+        else:
+            query_params["clOrdId"] = client_order_id
+        return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_order_path, query_params=query_params)
 
     def rest_account_fetch_open_order_create_rest_request_function(self):
         return self.rest_account_create_get_request_function_with_signature(
@@ -359,7 +363,7 @@ class Okx(Exchange):
             symbol=rest_request.json_payload["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             order_id=x["ordId"],
-            client_order_id=rest_request.json_payload["clOrdId"],
+            client_order_id=rest_request.json_payload.get("clOrdId"),
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             status=OrderStatus.CREATE_ACKNOWLEDGED,
         )
@@ -371,7 +375,8 @@ class Okx(Exchange):
             api_method=ApiMethod.REST,
             symbol=rest_request.json_payload["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
-            client_order_id=rest_request.json_payload["clOrdId"],
+            order_id=rest_request.json_payload.get("ordId"),
+            client_order_id=rest_request.json_payload.get("clOrdId"),
             status=OrderStatus.CANCEL_ACKNOWLEDGED,
         )
 
@@ -490,11 +495,13 @@ class Okx(Exchange):
             return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_historical_fill_path_2, query_params=query_params)
 
     async def handle_rest_response_for_error(self, *, rest_response):
-        Exchange.logger.warning("rest_response", rest_response)
+        self.logger.warning("rest_response", rest_response)
 
         if self.is_rest_response_for_create_order(rest_response=rest_response) or self.is_rest_response_for_cancel_order(rest_response=rest_response):
             await self.rest_account_fetch_order(
-                symbol=rest_response.rest_request.json_payload["instId"], client_order_id=rest_response.rest_request.json_payload["clOrdId"]
+                symbol=rest_response.rest_request.json_payload["instId"],
+                order_id=rest_response.rest_request.json_payload.get("ordId"),
+                client_order_id=rest_response.rest_request.json_payload.get("clOrdId"),
             )
         elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
             if (
@@ -504,7 +511,8 @@ class Okx(Exchange):
             ):
                 self.replace_order(
                     symbol=rest_response.rest_request.query_params["instId"],
-                    client_order_id=rest_response.rest_request.query_params["clOrdId"],
+                    order_id=rest_response.rest_request.query_params.get("ordId"),
+                    client_order_id=rest_response.rest_request.query_params.get("clOrdId"),
                     exchange_update_time_point=time_point_now(),
                     status=OrderStatus.REJECTED,
                 )
@@ -632,9 +640,9 @@ class Okx(Exchange):
         arg = self.account_create_order_create_json_payload(order=order)
         return WebsocketRequest(id=id, json_payload={"id": id, "op": "order", "args": [arg]}, json_serialize=self.json_serialize)
 
-    def websocket_account_cancel_order_create_websocket_request(self, *, symbol, client_order_id):
+    def websocket_account_cancel_order_create_websocket_request(self, *, symbol, order_id=None, client_order_id=None):
         id = self.generate_next_websocket_request_id()
-        arg = self.account_cancel_order_create_json_payload(symbol=symbol, client_order_id=client_order_id)
+        arg = self.account_cancel_order_create_json_payload(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
         return WebsocketRequest(id=id, json_payload={"id": id, "op": "cancel-order", "args": [arg]}, json_serialize=self.json_serialize)
 
     async def websocket_on_message(self, *, websocket_connection, raw_websocket_message_data):
@@ -756,7 +764,7 @@ class Okx(Exchange):
             symbol=websocket_request.json_payload["args"][0]["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             order_id=x["ordId"],
-            client_order_id=websocket_request.json_payload["args"][0]["clOrdId"],
+            client_order_id=websocket_request.json_payload["args"][0].get("clOrdId"),
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             status=OrderStatus.CREATE_ACKNOWLEDGED,
         )
@@ -768,7 +776,8 @@ class Okx(Exchange):
             api_method=ApiMethod.WEBSOCKET,
             symbol=websocket_request.json_payload["args"][0]["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
-            client_order_id=websocket_request.json_payload["args"][0]["clOrdId"],
+            order_id=websocket_request.json_payload["args"][0].get("ordId"),
+            client_order_id=websocket_request.json_payload["args"][0].get("clOrdId"),
             status=OrderStatus.CANCEL_ACKNOWLEDGED,
         )
 
@@ -791,14 +800,15 @@ class Okx(Exchange):
             await super().handle_websocket_push_data_for_fill(websocket_message=websocket_message)
 
     async def handle_websocket_response_for_error(self, *, websocket_message):
-        Exchange.logger.warning("websocket_message", websocket_message)
+        self.logger.warning("websocket_message", websocket_message)
 
         if self.is_websocket_response_for_create_order(websocket_message=websocket_message) or self.is_websocket_response_for_cancel_order(
             websocket_message=websocket_message
         ):
             await self.rest_account_fetch_order(
                 symbol=websocket_message.websocket_request.json_payload["args"][0]["instId"],
-                client_order_id=websocket_message.websocket_request.json_payload["args"][0]["clOrdId"],
+                order_id=websocket_message.websocket_request.json_payload["args"][0].get("ordId"),
+                client_order_id=websocket_message.websocket_request.json_payload["args"][0].get("clOrdId"),
             )
 
     def account_create_order_create_json_payload(self, *, order):
@@ -815,7 +825,7 @@ class Okx(Exchange):
 
         json_payload = {
             "instId": order.symbol,
-            "tdMode": str(self.margin_type) or "cash",
+            "tdMode": str(order.margin_type) if order.margin_type else "cash",
             "clOrdId": order.client_order_id,
             "side": "buy" if order.is_buy else "sell",
             "ordType": ord_type,
@@ -830,11 +840,15 @@ class Okx(Exchange):
             json_payload.update(order.extra_params)
         return json_payload
 
-    def account_cancel_order_create_json_payload(self, *, symbol, client_order_id):
-        return {
+    def account_cancel_order_create_json_payload(self, *, symbol, order_id=None, client_order_id=None):
+        json_payload = {
             "instId": symbol,
-            "clOrdId": client_order_id,
         }
+        if order_id:
+            json_payload["ordId"] = order_id
+        else:
+            json_payload["clOrdId"] = client_order_id
+        return json_payload
 
     def convert_dict_to_trade(self, *, input, api_method, symbol):
         return Trade(
@@ -870,8 +884,8 @@ class Okx(Exchange):
             api_method=api_method,
             symbol=symbol,
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["uTime"]),
-            order_id=input["ordId"],
-            client_order_id=input["clOrdId"],
+            order_id=input.get("ordId"),
+            client_order_id=input.get("clOrdId"),
             is_buy=input["side"] == "buy",
             price=input["px"] or None,
             quantity=input["sz"],
@@ -880,6 +894,7 @@ class Okx(Exchange):
             is_fok=input["ordType"] == "fok",
             is_ioc=input["ordType"] == "ioc",
             is_reduce_only=input["reduceOnly"] == "true",
+            margin_type=MarginType[input["tdMode"].upper()] if input["tdMode"] != "cash" else None,
             cumulative_filled_quantity=input["accFillSz"] or None,
             cumulative_filled_quote_quantity="{0:f}".format(Decimal(input["avgPx"]) * Decimal(input["accFillSz"]) * contract_size) if input["avgPx"] else None,
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["cTime"]),
@@ -895,8 +910,8 @@ class Okx(Exchange):
             api_method=api_method,
             symbol=symbol,
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["fillTime"]),
-            order_id=input["ordId"],
-            client_order_id=input["clOrdId"],
+            order_id=input.get("ordId"),
+            client_order_id=input.get("clOrdId"),
             trade_id=input["tradeId"],
             is_buy=input["side"] == "buy",
             price=input["fillPx"],
@@ -933,6 +948,7 @@ class Okx(Exchange):
                         is_long = False
 
         return Position(
+            margin_type=MarginType[input["mgnMode"].upper()],
             api_method=api_method,
             symbol=symbol,
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["uTime"]),
@@ -940,10 +956,10 @@ class Okx(Exchange):
             is_long=is_long,
             entry_price=input["avgPx"],
             mark_price=input["markPx"],
-            leverage=float(input["lever"]),
+            leverage=float(input["lever"]) if input["lever"] else None,
             initial_margin=float(input["imr"]) if input["imr"] else None,
-            maintenance_margin=float(input["mmr"]),
-            unrealized_pnl=float(input["upl"]),
+            maintenance_margin=float(input["mmr"]) if input["mmr"] else None,
+            unrealized_pnl=float(input["upl"]) if input["upl"] else None,
             liquidation_price=input["liqPx"],
         )
 

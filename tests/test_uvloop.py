@@ -16,16 +16,16 @@ pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="uvloop does not
 async def main():
     try:
         symbol = "BTC-USDT"
-        okx = Okx(
+        exchange = Okx(
             instrument_type=OkxInstrumentType.SPOT,
             symbols={symbol},
             subscribe_bbo=True,
             subscribe_order=True,
         )
 
-        await okx.start()
+        await exchange.start()
 
-        await okx.stop()
+        await exchange.stop()
 
         asyncio.get_running_loop().stop()
 

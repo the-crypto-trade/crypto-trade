@@ -19,6 +19,7 @@ import aiohttp
 from crypto_trade.utility import (
     Logger,
     LoggerApi,
+    LogLevel,
     RestRequest,
     RestResponse,
     WebsocketConnection,
@@ -56,7 +57,7 @@ class ExchangeApi:
         self.bbos: Dict[Symbol, Bbo] = {}
         self.trades: Dict[Symbol, List[Trade]] = {}  # the list of Trade objects are sorted earliest to latest
         self.ohlcvs: Dict[Symbol, List[Ohlcv]] = {}  # the list of Ohlcv objects are sorted earliest to latest
-        self.orders: Dict[Symbol, Dict[ClientOrderId, Order]] = {}
+        self.orders: Dict[Symbol, List[Order]] = {}
         self.fills: Dict[Symbol, List[Fill]] = {}  # the list of Fill objects are sorted earliest to latest
         self.positions: Dict[Symbol, Position] = {}
         self.balances: Dict[Symbol, Balance] = {}
@@ -70,15 +71,13 @@ class ExchangeApi:
     async def create_order(self, *, order: Order, trade_api_method_preference: Optional[ApiMethod] = None) -> Order:
         raise NotImplementedError
 
-    async def cancel_order(self, *, symbol: str, client_order_id: str, trade_api_method_preference: Optional[ApiMethod] = None) -> None:
+    async def cancel_order(
+        self, *, symbol: str, order_id: Optional[str] = None, client_order_id: Optional[str] = None, trade_api_method_preference: Optional[ApiMethod] = None
+    ) -> None:
         raise NotImplementedError
 
     async def cancel_orders(self, *, symbol: Optional[str] = None, trade_api_method_preference: Optional[ApiMethod] = None) -> None:
         # if symbol is not provided, it will try to cancel all open orders
-        raise NotImplementedError
-
-    @classmethod
-    def set_logger(cls, logger: LoggerApi) -> None:
         raise NotImplementedError
 
 
@@ -210,6 +209,20 @@ class Bbo(ModelBase):
     def best_ask_size_as_decimal(self):
         return Decimal(self.best_ask_size) if self.best_ask_size else None
 
+    @cached_property
+    def mid_price(self):
+        return "{0:f}".format(self.mid_price_as_decimal) if self.mid_price_as_decimal else None
+
+    @cached_property
+    def mid_price_as_float(self):
+        return (self.best_bid_price_as_float + self.best_ask_price_as_float) / 2 if self.best_bid_price_as_float and self.best_ask_price_as_float else None
+
+    @cached_property
+    def mid_price_as_decimal(self):
+        return (
+            (self.best_bid_price_as_decimal + self.best_ask_price_as_decimal) / 2 if self.best_bid_price_as_decimal and self.best_ask_price_as_decimal else None
+        )
+
 
 @dataclass(frozen=True, kw_only=True)
 class Trade(ModelBase):
@@ -326,12 +339,15 @@ class Order(ModelBase):
     is_ioc: Optional[bool] = False
     is_reduce_only: Optional[bool] = False
 
+    margin_type: Optional[MarginType] = None
+
     extra_params: Optional[Dict[str, Any]] = None
 
     cumulative_filled_quantity: Optional[str] = None
     cumulative_filled_quote_quantity: Optional[str] = None
 
     exchange_create_time_point: Optional[Tuple[int, int]] = None
+    local_update_time_point: Optional[Tuple[int, int]] = None
     status: Optional[OrderStatus] = None
 
     @cached_property
@@ -455,6 +471,7 @@ class Fill(ModelBase):
 
 @dataclass(frozen=True, kw_only=True)
 class Position(ModelBase):
+    margin_type: Optional[MarginType] = None
     quantity: Optional[str] = None
     is_long: Optional[bool] = None
     entry_price: Optional[str] = None
@@ -521,17 +538,11 @@ class Balance(ModelBase):
 
 class Exchange(ExchangeApi):
 
-    logger: LoggerApi = Logger()
-
-    @classmethod
-    def set_logger(cls, logger: LoggerApi) -> None:
-        Exchange.logger = logger
-
     def __init__(
         self,
         *,
         name: str,
-        symbols: str | Iterable[str],  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
+        symbols: str | Iterable[str] = "*",  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
         instrument_type: Optional[str] = None,  # Defaults to spot type. See each derived exchange class for allowed values for that exchange.
         # bbo
         subscribe_bbo: bool = False,
@@ -555,7 +566,6 @@ class Exchange(ExchangeApi):
         api_key: str = "",
         api_secret: str = "",
         api_passphrase: str = "",
-        margin_type: Optional[MarginType] = None,
         # order
         subscribe_order: bool = False,
         fetch_historical_order_at_start: bool = False,
@@ -607,6 +617,7 @@ class Exchange(ExchangeApi):
         client_session: Optional[aiohttp.ClientSession] = None,
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
+        logger: Optional[LoggerApi] = None,
     ) -> None:
         super().__init__()
 
@@ -619,8 +630,12 @@ class Exchange(ExchangeApi):
             self.symbols = set(symbols)
 
         self.instrument_type = instrument_type
+        if logger:
+            self.logger = logger
+        else:
+            self.logger = Logger(level=LogLevel.INFO, name=f"{self.name}:{self.instrument_type}")
         if not self.is_instrument_type_valid(instrument_type=instrument_type):
-            Exchange.logger.critical(Exception(f"invalid instrument_type {instrument_type} for exchange {self.name}"))
+            self.logger.critical(Exception(f"invalid instrument_type {instrument_type} for exchange {self.name}"))
 
         self.subscribe_bbo = subscribe_bbo
 
@@ -647,7 +662,6 @@ class Exchange(ExchangeApi):
         self.api_key = api_key
         self.api_secret = api_secret
         self.api_passphrase = api_passphrase
-        self.margin_type = margin_type
 
         self.subscribe_order = subscribe_order
         self.fetch_historical_order_at_start = fetch_historical_order_at_start
@@ -774,7 +788,7 @@ class Exchange(ExchangeApi):
         self.stopped = False
 
     async def start(self):
-        Exchange.logger.info("starting...")
+        self.logger.info("starting...")
 
         if self.rest_market_data_fetch_all_instrument_information_at_start or self.rest_market_data_fetch_all_instrument_information_period_seconds:
             await self.rest_market_data_fetch_all_instrument_information()
@@ -791,7 +805,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_market_data_fetch_all_instrument_information_period_seconds)
                         await self.rest_market_data_fetch_all_instrument_information()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_market_data_fetch_all_instrument_information())
 
@@ -806,7 +820,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_market_data_fetch_bbo_period_seconds)
                         await self.rest_market_data_fetch_bbo()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
 
@@ -823,7 +837,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_account_check_open_order_period_seconds)
                         await self.rest_account_check_open_order()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_account_check_open_order())
 
@@ -835,7 +849,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_account_check_in_flight_order_period_seconds)
                         await self.rest_account_check_in_flight_order()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_account_check_in_flight_order())
 
@@ -850,7 +864,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_account_fetch_position_period_seconds)
                         await self.rest_account_fetch_position()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_account_fetch_position())
 
@@ -865,7 +879,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.rest_account_fetch_balance_period_seconds)
                         await self.rest_account_fetch_balance()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_rest_account_fetch_balance())
 
@@ -877,7 +891,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.remove_historical_trade_interval_seconds)
                         self.remove_trades()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_remove_historical_trade())
 
@@ -889,7 +903,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.remove_historical_ohlcv_interval_seconds)
                         self.remove_ohlcvs()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_remove_historical_ohlcv())
 
@@ -901,7 +915,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.remove_historical_order_interval_seconds)
                         self.remove_orders()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_remove_historical_order())
 
@@ -913,7 +927,7 @@ class Exchange(ExchangeApi):
                         await asyncio.sleep(self.remove_historical_fill_interval_seconds)
                         self.remove_fills()
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_periodic_remove_historical_fill())
 
@@ -934,9 +948,9 @@ class Exchange(ExchangeApi):
                                         websocket_request=self.websocket_connection_ping_on_application_level_create_websocket_request(),
                                     )
                             except Exception as exception:
-                                Exchange.logger.error(exception)
+                                self.logger.error(exception)
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_websocket_connection_ping_on_application_level())
 
@@ -961,18 +975,18 @@ class Exchange(ExchangeApi):
                                     ):
                                         await websocket_connection.connection.close(message=b"application level heartbeat timeout")
                             except Exception as exception:
-                                Exchange.logger.error(exception)
+                                self.logger.error(exception)
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
             self.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
 
         await asyncio.sleep(self.start_wait_seconds)
 
-        Exchange.logger.info("started")
+        self.logger.info("started")
 
     async def stop(self):
-        Exchange.logger.info("stopping...")
+        self.logger.info("stopping...")
 
         self.stopped = True
 
@@ -990,12 +1004,12 @@ class Exchange(ExchangeApi):
 
         await asyncio.sleep(self.stop_wait_seconds)
 
-        Exchange.logger.info("stopped")
+        self.logger.info("stopped")
 
     async def create_order(self, *, order, trade_api_method_preference=None):
         order_to_create = self.create_order_ensure_client_order_id(order=order)
 
-        self.upsert_order(order=order_to_create)
+        self.append_order(order=order_to_create)
 
         order_to_create = self.create_order_ensure_client_order_id(order=order_to_create)
         if (
@@ -1004,7 +1018,7 @@ class Exchange(ExchangeApi):
             or self.websocket_account_trade_url_with_query_params not in self.websocket_logged_in_connections
         ):
             await self.send_rest_request(rest_request_function=self.rest_account_create_order_create_rest_request_function(order=order_to_create))
-            order_to_create = self.orders[order_to_create.symbol][order_to_create.client_order_id]
+            order_to_create = self.get_order(symbol=order_to_create.symbol, client_order_id=order_to_create.client_order_id)
         else:
             await self.send_websocket_request(
                 websocket_connection=self.websocket_connections[self.websocket_account_trade_url_with_query_params],
@@ -1019,10 +1033,10 @@ class Exchange(ExchangeApi):
                 order, exchange_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT, client_order_id=self.generate_next_client_order_id()
             )
         else:
-            return dataclasses.replace(order, exchange_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT)
+            return dataclasses.replace(order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT)
 
-    async def cancel_order(self, *, symbol, client_order_id, trade_api_method_preference=None):
-        self.replace_order(symbol=symbol, client_order_id=client_order_id, exchange_update_time_point=time_point_now(), status=OrderStatus.CANCEL_IN_FLIGHT)
+    async def cancel_order(self, *, symbol, order_id=None, client_order_id=None, trade_api_method_preference=None):
+        self.replace_order(symbol=symbol, client_order_id=client_order_id, local_update_time_point=time_point_now(), status=OrderStatus.CANCEL_IN_FLIGHT)
 
         if (
             (trade_api_method_preference is None and (self.trade_api_method_preference is None or self.trade_api_method_preference == ApiMethod.REST))
@@ -1030,27 +1044,41 @@ class Exchange(ExchangeApi):
             or self.websocket_account_trade_url_with_query_params not in self.websocket_logged_in_connections
         ):
             await self.send_rest_request(
-                rest_request_function=self.rest_account_cancel_order_create_rest_request_function(symbol=symbol, client_order_id=client_order_id)
+                rest_request_function=self.rest_account_cancel_order_create_rest_request_function(
+                    symbol=symbol, order_id=order_id, client_order_id=client_order_id
+                )
             )
         else:
             await self.send_websocket_request(
                 websocket_connection=self.websocket_connections[self.websocket_account_trade_url_with_query_params],
-                websocket_request=self.websocket_account_cancel_order_create_websocket_request(symbol=symbol, client_order_id=client_order_id),
+                websocket_request=self.websocket_account_cancel_order_create_websocket_request(
+                    symbol=symbol, order_id=order_id, client_order_id=client_order_id
+                ),
             )
 
     async def cancel_orders(self, *, symbol=None, trade_api_method_preference=None):
         if symbol:
             if symbol in self.orders:
-                for client_order_id, order in self.orders[symbol].items():
+                for order in self.orders[symbol]:
                     if not order.is_in_flight and order.is_open:
-                        await self.cancel_order(symbol=symbol, client_order_id=client_order_id, trade_api_method_preference=trade_api_method_preference)
+                        await self.cancel_order(
+                            symbol=symbol,
+                            order_id=order.order_id,
+                            client_order_id=order.client_order_id,
+                            trade_api_method_preference=trade_api_method_preference,
+                        )
             else:
-                Exchange.logger.warning(f"symbol {symbol} not found in self.orders", self.orders)
+                self.logger.warning(f"symbol {symbol} not found in self.orders", self.orders)
         else:
             for symbol, orders_for_symbol in self.orders.items():
-                for client_order_id, order in orders_for_symbol.items():
+                for order in orders_for_symbol:
                     if not order.is_in_flight and order.is_open:
-                        await self.cancel_order(symbol=symbol, client_order_id=client_order_id, trade_api_method_preference=trade_api_method_preference)
+                        await self.cancel_order(
+                            symbol=symbol,
+                            order_id=order.order_id,
+                            client_order_id=order.client_order_id,
+                            trade_api_method_preference=trade_api_method_preference,
+                        )
 
     def is_instrument_type_valid(self, *, instrument_type):
         return True
@@ -1063,7 +1091,7 @@ class Exchange(ExchangeApi):
                 await asyncio.sleep(next_rest_request_delay_seconds)
 
             rest_request = next_rest_request_function(time_point=time_point_now())
-            Exchange.logger.detail("rest_request", rest_request)
+            self.logger.fine("rest_request", rest_request)
 
             async with self.client_session.request(
                 method=rest_request.method,
@@ -1076,7 +1104,7 @@ class Exchange(ExchangeApi):
                 try:
                     raw_rest_response = client_response
                     rest_response = await self.rest_on_response(rest_request=rest_request, raw_rest_response=raw_rest_response)
-                    Exchange.logger.detail("rest_response", rest_response)
+                    self.logger.fine("rest_response", rest_response)
 
                     if not rest_response or rest_response.next_rest_request_function is None:
                         break
@@ -1085,12 +1113,12 @@ class Exchange(ExchangeApi):
                         next_rest_request_delay_seconds = rest_response.next_rest_request_delay_seconds
 
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
                     break
 
     async def rest_on_response(self, *, rest_request, raw_rest_response):
         raw_rest_response_text = await raw_rest_response.text()
-        Exchange.logger.trace("raw_rest_response_text", raw_rest_response_text)
+        self.logger.trace("raw_rest_response_text", raw_rest_response_text)
         rest_response = RestResponse(
             rest_request=rest_request,
             status_code=raw_rest_response.status,
@@ -1160,9 +1188,9 @@ class Exchange(ExchangeApi):
     async def rest_market_data_fetch_historical_ohlcv(self, *, symbol):
         await self.send_rest_request(rest_request_function=self.rest_market_data_fetch_historical_ohlcv_create_rest_request_function(symbol=symbol))
 
-    async def rest_account_fetch_order(self, *, symbol, client_order_id):
+    async def rest_account_fetch_order(self, *, symbol, order_id=None, client_order_id=None):
         await self.send_rest_request(
-            rest_request_function=self.rest_account_fetch_order_create_rest_request_function(symbol=symbol, client_order_id=client_order_id)
+            rest_request_function=self.rest_account_fetch_order_create_rest_request_function(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
         )
 
     async def rest_account_fetch_open_order(self):
@@ -1176,7 +1204,7 @@ class Exchange(ExchangeApi):
 
     async def rest_account_check_open_order(self):
         for symbol, orders_for_symbol in self.orders.items():
-            for client_order_id, order in orders_for_symbol.items():
+            for order in orders_for_symbol:
                 now_time_point = time_point_now()
                 if (
                     order.is_open
@@ -1185,12 +1213,12 @@ class Exchange(ExchangeApi):
                     )
                     > self.rest_account_check_open_order_threshold_seconds
                 ):
-                    await self.rest_account_fetch_order(symbol=symbol, client_order_id=client_order_id)
+                    await self.rest_account_fetch_order(symbol=symbol, order_id=order.order_id, client_order_id=order.client_order_id)
                     await asyncio.sleep(self.rest_account_send_consecutive_request_delay_seconds)
 
     async def rest_account_check_in_flight_order(self):
         for symbol, orders_for_symbol in self.orders.items():
-            for client_order_id, order in orders_for_symbol.items():
+            for order in orders_for_symbol:
                 now_time_point = time_point_now()
                 if (
                     order.is_in_flight
@@ -1199,7 +1227,7 @@ class Exchange(ExchangeApi):
                     )
                     > self.rest_account_check_in_flight_order_threshold_seconds
                 ):
-                    await self.rest_account_fetch_order(symbol=symbol, client_order_id=client_order_id)
+                    await self.rest_account_fetch_order(symbol=symbol, order_id=order.order_id, client_order_id=order.client_order_id)
                     await asyncio.sleep(self.rest_account_send_consecutive_request_delay_seconds)
 
     async def rest_account_fetch_historical_data(self):
@@ -1259,10 +1287,10 @@ class Exchange(ExchangeApi):
     def rest_account_create_order_create_rest_request_function(self, *, order):
         raise NotImplementedError
 
-    def rest_account_cancel_order_create_rest_request_function(self, *, symbol, client_order_id):
+    def rest_account_cancel_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
         raise NotImplementedError
 
-    def rest_account_fetch_order_create_rest_request_function(self, *, symbol, client_order_id):
+    def rest_account_fetch_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
         raise NotImplementedError
 
     def rest_account_fetch_open_order_create_rest_request_function(self):
@@ -1374,26 +1402,26 @@ class Exchange(ExchangeApi):
         all_instrument_information = self.convert_rest_response_for_all_instrument_information(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("all_instrument_information", all_instrument_information)
-        Exchange.logger.trace("self.all_instrument_information", all_instrument_information)
+        self.logger.trace("all_instrument_information", all_instrument_information)
+        self.logger.trace("self.all_instrument_information", all_instrument_information)
         for instrument_information in all_instrument_information:
             self.all_instrument_information[instrument_information.symbol] = instrument_information
-        Exchange.logger.debug("self.all_instrument_information", all_instrument_information)
+        self.logger.debug("self.all_instrument_information", all_instrument_information)
 
     async def handle_rest_response_for_bbo(self, *, rest_response):
         bbos = self.convert_rest_response_for_bbo(json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request)
-        Exchange.logger.trace("bbos", bbos)
-        Exchange.logger.trace("self.bbos", self.bbos)
+        self.logger.trace("bbos", bbos)
+        self.logger.trace("self.bbos", self.bbos)
         for bbo in bbos:
             self.update_bbo(bbo=bbo)
-        Exchange.logger.debug("self.bbos", self.bbos)
+        self.logger.debug("self.bbos", self.bbos)
 
     async def handle_rest_response_for_historical_trade(self, *, rest_response):
         historical_trades = self.convert_rest_response_for_historical_trade(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("historical_trades", historical_trades)
-        Exchange.logger.trace("self.trades", self.trades)
+        self.logger.trace("historical_trades", historical_trades)
+        self.logger.trace("self.trades", self.trades)
         if historical_trades:
             symbol = historical_trades[0].symbol
             historical_trades_filtered = [
@@ -1418,7 +1446,7 @@ class Exchange(ExchangeApi):
                     for x in historical_trades_sorted
                     if (x.exchange_update_time_point, x.trade_id_as_int) < (head.exchange_update_time_point, head.trade_id_as_int)
                 ]
-        Exchange.logger.debug("self.trades", self.trades)
+        self.logger.debug("self.trades", self.trades)
 
         rest_response.next_rest_request_function = self.convert_rest_response_for_historical_trade_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
@@ -1431,8 +1459,8 @@ class Exchange(ExchangeApi):
         historical_ohlcvs = self.convert_rest_response_for_historical_ohlcv(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("historical_ohlcvs", historical_ohlcvs)
-        Exchange.logger.trace("self.ohlcvs", self.ohlcvs)
+        self.logger.trace("historical_ohlcvs", historical_ohlcvs)
+        self.logger.trace("self.ohlcvs", self.ohlcvs)
         if historical_ohlcvs:
             symbol = historical_ohlcvs[0].symbol
             historical_ohlcvs_filtered = [
@@ -1453,7 +1481,7 @@ class Exchange(ExchangeApi):
             else:
                 head = self.ohlcvs[symbol][0]
                 self.ohlcvs[symbol][:0] = [x for x in historical_ohlcvs_sorted if x.start_unix_timestamp_seconds < head.start_unix_timestamp_seconds]
-        Exchange.logger.debug("self.ohlcvs", self.ohlcvs)
+        self.logger.debug("self.ohlcvs", self.ohlcvs)
 
         rest_response.next_rest_request_function = self.convert_rest_response_for_historical_ohlcv_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
@@ -1466,35 +1494,35 @@ class Exchange(ExchangeApi):
         order = self.convert_rest_response_for_create_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("order", order)
+        self.logger.trace("order", order)
         self.update_order(order=order)
-        Exchange.logger.debug("order updated", self.orders[order.symbol][order.client_order_id])
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
 
     async def handle_rest_response_for_cancel_order(self, *, rest_response):
         order = self.convert_rest_response_for_cancel_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("order", order)
+        self.logger.trace("order", order)
         self.update_order(order=order)
-        Exchange.logger.debug("order updated", self.orders[order.symbol][order.client_order_id])
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
 
     async def handle_rest_response_for_fetch_order(self, *, rest_response):
         order = self.convert_rest_response_for_fetch_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("order", order)
+        self.logger.trace("order", order)
         self.update_order(order=order)
-        Exchange.logger.debug("order updated", self.orders[order.symbol][order.client_order_id])
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
 
     async def handle_rest_response_for_fetch_open_order(self, *, rest_response):
         open_orders = self.convert_rest_response_for_fetch_open_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("open_orders", open_orders)
-        Exchange.logger.trace("self.orders", self.orders)
+        self.logger.trace("open_orders", open_orders)
+        self.logger.trace("self.orders", self.orders)
         for open_order in open_orders:
             self.update_order(order=open_order)
-        Exchange.logger.debug("self.orders", self.orders)
+        self.logger.debug("self.orders", self.orders)
 
         rest_response.next_rest_request_function = self.convert_rest_response_for_fetch_open_order_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
@@ -1507,11 +1535,11 @@ class Exchange(ExchangeApi):
         historical_orders = self.convert_rest_response_for_historical_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("historical_orders", historical_orders)
-        Exchange.logger.trace("self.orders", self.orders)
+        self.logger.trace("historical_orders", historical_orders)
+        self.logger.trace("self.orders", self.orders)
         for historical_order in historical_orders:
             self.update_order(order=historical_order)
-        Exchange.logger.trace("self.orders", self.orders)
+        self.logger.trace("self.orders", self.orders)
 
         rest_response.next_rest_request_function = self.convert_rest_response_for_historical_order_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
@@ -1524,8 +1552,8 @@ class Exchange(ExchangeApi):
         historical_fills = self.convert_rest_response_for_historical_fill(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("historical_fills", historical_fills)
-        Exchange.logger.trace("self.fills", self.fills)
+        self.logger.trace("historical_fills", historical_fills)
+        self.logger.trace("self.fills", self.fills)
         if historical_fills:
             symbol = historical_fills[0].symbol
             historical_fills_filtered = [
@@ -1550,7 +1578,7 @@ class Exchange(ExchangeApi):
                     for x in historical_fills_sorted
                     if (x.exchange_update_time_point, x.trade_id_as_int) < (head.exchange_update_time_point, head.trade_id_as_int)
                 ]
-        Exchange.logger.debug("self.fills", self.fills)
+        self.logger.debug("self.fills", self.fills)
 
         rest_response.next_rest_request_function = self.convert_rest_response_for_historical_fill_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
@@ -1563,8 +1591,8 @@ class Exchange(ExchangeApi):
         positions = self.convert_rest_response_for_fetch_position(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("positions", positions)
-        Exchange.logger.trace("self.positions", self.positions)
+        self.logger.trace("positions", positions)
+        self.logger.trace("self.positions", self.positions)
         positions_not_zero = [x for x in positions if not x.quantity_as_decimal.is_zero()]
         for position in positions_not_zero:
             self.update_position(position=position)
@@ -1572,14 +1600,14 @@ class Exchange(ExchangeApi):
         self.positions = {
             symbol: positions_for_symbol for symbol, positions_for_symbol in self.positions.items() if symbol in {x.symbol for x in positions_not_zero}
         }
-        Exchange.logger.debug("self.positions", self.positions)
+        self.logger.debug("self.positions", self.positions)
 
     async def handle_rest_response_for_fetch_balance(self, *, rest_response):
         balances = self.convert_rest_response_for_fetch_balance(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        Exchange.logger.trace("balances", balances)
-        Exchange.logger.trace("self.balances", self.balances)
+        self.logger.trace("balances", balances)
+        self.logger.trace("self.balances", self.balances)
         balances_not_zero = [x for x in balances if not x.quantity_as_decimal.is_zero()]
         for balance in balances_not_zero:
             self.update_balance(balance=balance)
@@ -1587,7 +1615,7 @@ class Exchange(ExchangeApi):
         self.balances = {
             symbol: balances_for_symbol for symbol, balances_for_symbol in self.balances.items() if symbol in {x.symbol for x in balances_not_zero}
         }
-        Exchange.logger.debug("self.balances", self.balances)
+        self.logger.debug("self.balances", self.balances)
 
     async def handle_rest_response_for_error(self, *, rest_response):
         raise NotImplementedError
@@ -1598,7 +1626,7 @@ class Exchange(ExchangeApi):
                 url = create_url(base_url=base_url, path=path)
 
                 websocket_connection = WebsocketConnection(base_url=base_url, path=path, query_params=query_params)
-                Exchange.logger.detail("websocket_connection", websocket_connection)
+                self.logger.fine("websocket_connection", websocket_connection)
 
                 try:
                     async with self.client_session.ws_connect(
@@ -1617,47 +1645,47 @@ class Exchange(ExchangeApi):
                                         websocket_connection=websocket_connection, raw_websocket_message_data=raw_websocket_message.data
                                     )
                                 except Exception as exception:
-                                    Exchange.logger.error(exception)
+                                    self.logger.error(exception)
 
                             elif raw_websocket_message.type == aiohttp.WSMsgType.ERROR:
                                 break
 
-                        Exchange.logger.warning(f"websocket connection to {websocket_connection.url_with_query_params} is closed")
+                        self.logger.warning(f"websocket connection to {websocket_connection.url_with_query_params} is closed")
                         websocket_connection_exception = websocket_connection.connection.exception()
 
                         if websocket_connection_exception:
-                            Exchange.logger.warning(repr(websocket_connection_exception))
+                            self.logger.warning(repr(websocket_connection_exception))
                         else:
                             if raw_websocket_message:
-                                Exchange.logger.detail("last message type", raw_websocket_message.type)
-                                Exchange.logger.detail("last message data", raw_websocket_message.data)
+                                self.logger.fine("last message type", raw_websocket_message.type)
+                                self.logger.fine("last message data", raw_websocket_message.data)
 
                     await self.websocket_on_disconnected(websocket_connection=websocket_connection)
 
                 except Exception as exception:
-                    Exchange.logger.error(exception)
+                    self.logger.error(exception)
 
                 if self.websocket_connection_auto_reconnect and not self.stopped:
                     url_with_query_params = websocket_connection.url_with_query_params
                     next_websocket_reconnect_delay_seconds = self.generate_next_websocket_reconnect_delay_seconds(url_with_query_params=url_with_query_params)
-                    Exchange.logger.warning(f"delay for {next_websocket_reconnect_delay_seconds} seconds before websocket reconnect to {url_with_query_params}")
+                    self.logger.warning(f"delay for {next_websocket_reconnect_delay_seconds} seconds before websocket reconnect to {url_with_query_params}")
                     await asyncio.sleep(next_websocket_reconnect_delay_seconds)
                 else:
                     break
 
         except Exception as exception:
-            Exchange.logger.error(exception)
+            self.logger.error(exception)
 
     async def send_websocket_request(self, *, websocket_connection, websocket_request):
-        Exchange.logger.detail("websocket_connection", websocket_connection)
-        Exchange.logger.detail("websocket_request", websocket_request)
+        self.logger.fine("websocket_connection", websocket_connection)
+        self.logger.fine("websocket_request", websocket_request)
 
         if not websocket_connection.connection.closed and websocket_request and websocket_request.payload:
             self.websocket_requests[websocket_request.id] = websocket_request
             await websocket_connection.connection.send_str(websocket_request.payload)
 
     async def websocket_on_message(self, *, websocket_connection, raw_websocket_message_data):
-        Exchange.logger.trace("raw_websocket_message_data", raw_websocket_message_data)
+        self.logger.trace("raw_websocket_message_data", raw_websocket_message_data)
 
         websocket_message = WebsocketMessage(
             websocket_connection=websocket_connection, payload=raw_websocket_message_data, json_deserialize=self.json_deserialize
@@ -1667,7 +1695,7 @@ class Exchange(ExchangeApi):
         if websocket_message.websocket_request_id:
             websocket_request = self.websocket_requests.pop(websocket_message.websocket_request_id, None)
             websocket_message.websocket_request = websocket_request
-        Exchange.logger.detail("websocket_message", websocket_message)
+        self.logger.fine("websocket_message", websocket_message)
 
         if self.is_websocket_push_data(websocket_message=websocket_message):
             if self.is_websocket_push_data_for_bbo(websocket_message=websocket_message):
@@ -1772,11 +1800,11 @@ class Exchange(ExchangeApi):
     def websocket_account_create_order_create_websocket_request(self, *, order):
         raise NotImplementedError
 
-    def websocket_account_cancel_order_create_websocket_request(self, *, symbol, client_order_id):
+    def websocket_account_cancel_order_create_websocket_request(self, *, symbol, order_id=None, client_order_id=None):
         raise NotImplementedError
 
     async def websocket_on_connected(self, *, websocket_connection):
-        Exchange.logger.trace("websocket_connection", websocket_connection)
+        self.logger.trace("websocket_connection", websocket_connection)
         self.websocket_connections[websocket_connection.url_with_query_params] = websocket_connection
         await self.handle_websocket_on_connected(websocket_connection=websocket_connection)
 
@@ -1787,7 +1815,7 @@ class Exchange(ExchangeApi):
             await self.websocket_login(websocket_connection=websocket_connection)
 
     async def websocket_on_disconnected(self, *, websocket_connection):
-        Exchange.logger.trace("websocket_connection", websocket_connection)
+        self.logger.trace("websocket_connection", websocket_connection)
         await self.handle_websocket_on_disconnected(websocket_connection=websocket_connection)
         self.websocket_connections.pop(websocket_connection.url_with_query_params, None)
         self.websocket_logged_in_connections.discard(websocket_connection.url_with_query_params)
@@ -1866,16 +1894,16 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_bbo(self, *, websocket_message):
         bbos = self.convert_websocket_push_data_for_bbo(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("bbos", bbos)
-        Exchange.logger.trace("self.bbos", self.bbos)
+        self.logger.trace("bbos", bbos)
+        self.logger.trace("self.bbos", self.bbos)
         for bbo in bbos:
             self.update_bbo(bbo=bbo)
-        Exchange.logger.debug("self.bbos", self.bbos)
+        self.logger.debug("self.bbos", self.bbos)
 
     async def handle_websocket_push_data_for_trade(self, *, websocket_message):
         trades = self.convert_websocket_push_data_for_trade(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("trades", trades)
-        Exchange.logger.trace("self.trades", self.trades)
+        self.logger.trace("trades", trades)
+        self.logger.trace("self.trades", self.trades)
         if trades:
             symbol = trades[0].symbol
             trades_sorted = sorted(trades, key=lambda x: (x.exchange_update_time_point, x.trade_id_as_int))
@@ -1886,12 +1914,12 @@ class Exchange(ExchangeApi):
                 self.trades[symbol].extend(
                     [x for x in trades_sorted if (x.exchange_update_time_point, x.trade_id_as_int) > (tail.exchange_update_time_point, tail.trade_id_as_int)]
                 )
-        Exchange.logger.debug("self.trades", self.trades)
+        self.logger.debug("self.trades", self.trades)
 
     async def handle_websocket_push_data_for_ohlcv(self, *, websocket_message):
         ohlcvs = self.convert_websocket_push_data_for_ohlcv(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("ohlcvs", ohlcvs)
-        Exchange.logger.trace("self.ohlcvs", self.ohlcvs)
+        self.logger.trace("ohlcvs", ohlcvs)
+        self.logger.trace("self.ohlcvs", self.ohlcvs)
         if ohlcvs:
             symbol = ohlcvs[0].symbol
             ohlcvs_sorted = sorted(ohlcvs, key=lambda x: x.start_unix_timestamp_seconds)
@@ -1902,20 +1930,20 @@ class Exchange(ExchangeApi):
                 if tail.start_unix_timestamp_seconds == ohlcvs_sorted[0].start_unix_timestamp_seconds:
                     self.ohlcvs[symbol][-1] = ohlcvs_sorted[0]
                 self.ohlcvs[symbol].extend([x for x in ohlcvs_sorted if (x.start_unix_timestamp_seconds) > (tail.start_unix_timestamp_seconds)])
-        Exchange.logger.debug("self.ohlcvs", self.ohlcvs)
+        self.logger.debug("self.ohlcvs", self.ohlcvs)
 
     async def handle_websocket_push_data_for_order(self, *, websocket_message):
         orders = self.convert_websocket_push_data_for_order(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("orders", orders)
-        Exchange.logger.trace("self.orders", self.orders)
+        self.logger.trace("orders", orders)
+        self.logger.trace("self.orders", self.orders)
         for order in orders:
             self.update_order(order=order)
-        Exchange.logger.debug("self.orders", self.orders)
+        self.logger.debug("self.orders", self.orders)
 
     async def handle_websocket_push_data_for_fill(self, *, websocket_message):
         fills = self.convert_websocket_push_data_for_fill(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("fills", fills)
-        Exchange.logger.trace("self.fills", self.fills)
+        self.logger.trace("fills", fills)
+        self.logger.trace("self.fills", self.fills)
         if fills:
             symbol = fills[0].symbol
             fills_sorted = sorted(fills, key=lambda x: (x.exchange_update_time_point, x.trade_id_as_int))
@@ -1926,47 +1954,47 @@ class Exchange(ExchangeApi):
                 self.fills[symbol].extend(
                     [x for x in fills_sorted if (x.exchange_update_time_point, x.trade_id_as_int) > (tail.exchange_update_time_point, tail.trade_id_as_int)]
                 )
-        Exchange.logger.debug("self.fills", self.fills)
+        self.logger.debug("self.fills", self.fills)
 
     async def handle_websocket_push_data_for_position(self, *, websocket_message):
         positions = self.convert_websocket_push_data_for_position(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("positions", positions)
-        Exchange.logger.trace("self.positions", self.positions)
+        self.logger.trace("positions", positions)
+        self.logger.trace("self.positions", self.positions)
         for position in positions:
             self.update_position(position=position)
-        Exchange.logger.debug("self.positions", self.positions)
+        self.logger.debug("self.positions", self.positions)
 
     async def handle_websocket_push_data_for_balance(self, *, websocket_message):
         balances = self.convert_websocket_push_data_for_balance(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        Exchange.logger.trace("balances", balances)
-        Exchange.logger.trace("self.balances", self.balances)
+        self.logger.trace("balances", balances)
+        self.logger.trace("self.balances", self.balances)
         for balance in balances:
             self.update_balance(balance=balance)
-        Exchange.logger.debug("self.balances", self.balances)
+        self.logger.debug("self.balances", self.balances)
 
     async def handle_websocket_response_for_create_order(self, *, websocket_message):
         order = self.convert_websocket_response_for_create_order(
             json_deserialized_payload=websocket_message.json_deserialized_payload, websocket_request=websocket_message.websocket_request
         )
-        Exchange.logger.trace("order", order)
+        self.logger.trace("order", order)
         self.update_order(order=order)
-        Exchange.logger.debug("order updated", self.orders[order.symbol][order.client_order_id])
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
 
     async def handle_websocket_response_for_cancel_order(self, *, websocket_message):
         order = self.convert_websocket_response_for_cancel_order(
             json_deserialized_payload=websocket_message.json_deserialized_payload, websocket_request=websocket_message.websocket_request
         )
-        Exchange.logger.trace("order", order)
+        self.logger.trace("order", order)
         self.update_order(order=order)
-        Exchange.logger.debug("order updated", self.orders[order.symbol][order.client_order_id])
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
 
     async def handle_websocket_response_for_subscribe(self, *, websocket_message):
-        Exchange.logger.info("websocket_message", websocket_message)
+        self.logger.detail("websocket_message", websocket_message)
         websocket_connection = websocket_message.websocket_connection
         self.reset_websocket_reconnect_delay(url_with_query_params=websocket_connection.url_with_query_params)
 
     async def handle_websocket_response_for_login(self, *, websocket_message):
-        Exchange.logger.info("websocket_message", websocket_message)
+        self.logger.detail("websocket_message", websocket_message)
         websocket_connection = websocket_message.websocket_connection
         url_with_query_params = websocket_connection.url_with_query_params
         self.websocket_logged_in_connections.add(url_with_query_params)
@@ -1983,7 +2011,7 @@ class Exchange(ExchangeApi):
                 await asyncio.sleep(self.reset_websocket_reconnect_delay_delay_seconds)
                 self.websocket_reconnect_delay_seconds.pop(url_with_query_params, None)
             except Exception as exception:
-                Exchange.logger.error(exception)
+                self.logger.error(exception)
 
         self.create_task(coro=start_reset_websocket_reconnect_delay())
 
@@ -2005,25 +2033,33 @@ class Exchange(ExchangeApi):
         ):
             self.bbos[bbo.symbol] = bbo
 
-    def has_order(self, *, symbol, client_order_id):
-        return symbol in self.orders and client_order_id in self.orders[symbol]
+    def get_order(self, *, symbol, order_id=None, client_order_id=None):
+        orders_for_symbol = self.orders.get(symbol, [])
+        return next(
+            (
+                (index, order)
+                for index, order in enumerate(orders_for_symbol)
+                if (order.order_id == order_id if order_id else order.client_order_id == client_order_id)
+            ),
+            None,
+        )
 
-    def get_order(self, *, symbol, client_order_id):
-        return self.orders.get(symbol, {}).get(client_order_id)
-
-    def upsert_order(self, *, order):
+    def append_order(self, *, order):
         if order.symbol not in self.orders:
-            self.orders[order.symbol] = {}
-        self.orders[order.symbol][order.client_order_id] = order
+            self.orders[order.symbol] = []
+        self.orders[order.symbol].append(order)
 
-    def replace_order(self, *, symbol, client_order_id, **kwargs):
-        if self.has_order(symbol=symbol, client_order_id=client_order_id):
-            self.orders[symbol][client_order_id] = dataclasses.replace(self.orders[symbol][client_order_id], **kwargs)
+    def replace_order(self, *, symbol, order_id=None, client_order_id=None, **kwargs):
+        index_and_order = self.get_order(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
+        if index_and_order:
+            index, order = index_and_order
+            self.orders[symbol][index] = dataclasses.replace(order, **kwargs)
 
     def update_order(self, *, order):
-        order_to_update = self.get_order(symbol=order.symbol, client_order_id=order.client_order_id)
+        index_and_order_to_update = self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)
 
-        if order_to_update:
+        if index_and_order_to_update:
+            index, order_to_update = index_and_order_to_update
             exchange_update_time_point = order_to_update.exchange_update_time_point
             status = order_to_update.status
             cumulative_filled_quantity = order_to_update.cumulative_filled_quantity
@@ -2064,6 +2100,8 @@ class Exchange(ExchangeApi):
                 is_ioc = order_to_update.is_ioc
                 is_reduce_only = order_to_update.is_reduce_only
 
+                margin_type = order_to_update.margin_type
+
                 cumulative_filled_quantity = order_to_update.cumulative_filled_quantity
                 cumulative_filled_quote_quantity = order_to_update.cumulative_filled_quote_quantity
                 if has_fill:
@@ -2074,31 +2112,48 @@ class Exchange(ExchangeApi):
                 if exchange_create_time_point is None and order.exchange_create_time_point is not None:
                     exchange_create_time_point = order.exchange_create_time_point
 
+                local_update_time_point = time_point_now()
                 status = order.status
 
-                self.upsert_order(
-                    order=Order(
-                        api_method=api_method,
-                        symbol=symbol,
-                        exchange_update_time_point=exchange_update_time_point,
-                        order_id=order_id,
-                        client_order_id=client_order_id,
-                        is_buy=is_buy,
-                        price=price,
-                        quantity=quantity,
-                        is_market=is_market,
-                        is_post_only=is_post_only,
-                        is_fok=is_fok,
-                        is_ioc=is_ioc,
-                        is_reduce_only=is_reduce_only,
-                        cumulative_filled_quantity=cumulative_filled_quantity,
-                        cumulative_filled_quote_quantity=cumulative_filled_quote_quantity,
-                        exchange_create_time_point=exchange_create_time_point,
-                        status=status,
-                    )
+                self.orders[symbol][index] = Order(
+                    api_method=api_method,
+                    symbol=symbol,
+                    exchange_update_time_point=exchange_update_time_point,
+                    order_id=order_id,
+                    client_order_id=client_order_id,
+                    is_buy=is_buy,
+                    price=price,
+                    quantity=quantity,
+                    is_market=is_market,
+                    is_post_only=is_post_only,
+                    is_fok=is_fok,
+                    is_ioc=is_ioc,
+                    is_reduce_only=is_reduce_only,
+                    margin_type=margin_type,
+                    cumulative_filled_quantity=cumulative_filled_quantity,
+                    cumulative_filled_quote_quantity=cumulative_filled_quote_quantity,
+                    exchange_create_time_point=exchange_create_time_point,
+                    local_update_time_point=local_update_time_point,
+                    status=status,
                 )
         else:
-            self.upsert_order(order=order)
+            self.append_order(order=order)
+
+    def get_open_orders(self):
+        open_orders = {}
+        for symbol, orders_for_symbol in self.orders.items():
+            open_orders_for_symbol = [order for order in orders_for_symbol if order.is_open]
+            if open_orders_for_symbol:
+                open_orders[symbol] = open_orders_for_symbol
+        return open_orders
+
+    def get_in_flight_orders(self):
+        open_orders = {}
+        for symbol, orders_for_symbol in self.orders.items():
+            open_orders_for_symbol = [order for order in orders_for_symbol if order.is_in_flight]
+            if open_orders_for_symbol:
+                open_orders[symbol] = open_orders_for_symbol
+        return open_orders
 
     def update_position(self, *, position):
         if position.symbol not in self.positions or (
@@ -2123,7 +2178,7 @@ class Exchange(ExchangeApi):
                 self.balances[balance.symbol] = balance
 
     def remove_trades(self):
-        Exchange.logger.trace("self.trades", self.trades)
+        self.logger.trace("self.trades", self.trades)
 
         if self.keep_historical_trade_seconds:
             for symbol, trades_for_symbol in self.trades.items():
@@ -2134,10 +2189,10 @@ class Exchange(ExchangeApi):
                     if head_exchange_update_time_point < earliest_exchange_update_time_point_to_keep:
                         self.trades[symbol] = [x for x in trades_for_symbol if x.exchange_update_time_point[0] >= earliest_exchange_update_time_point_to_keep]
 
-        Exchange.logger.debug("self.trades", self.trades)
+        self.logger.debug("self.trades", self.trades)
 
     def remove_ohlcvs(self):
-        Exchange.logger.trace("self.ohlcvs", self.ohlcvs)
+        self.logger.trace("self.ohlcvs", self.ohlcvs)
 
         if self.keep_historical_ohlcv_seconds:
             for symbol, ohlcvs_for_symbol in self.ohlcvs.items():
@@ -2147,35 +2202,35 @@ class Exchange(ExchangeApi):
                 if head_start_unix_timestamp_seconds < earliest_start_unix_timestamp_seconds_to_keep:
                     self.ohlcvs[symbol] = [x for x in ohlcvs_for_symbol if x.start_unix_timestamp_seconds >= earliest_start_unix_timestamp_seconds_to_keep]
 
-        Exchange.logger.debug("self.ohlcvs", self.ohlcvs)
+        self.logger.debug("self.ohlcvs", self.ohlcvs)
 
     def remove_orders(self):
-        Exchange.logger.trace("self.orders", self.orders)
+        self.logger.trace("self.orders", self.orders)
 
         if self.keep_historical_order_seconds:
             for symbol, orders_for_symbol in self.orders.items():
-                latest_exchange_update_time_point = None
-                for order in orders_for_symbol.values():
+                latest_local_update_time_point = None
+                for order in orders_for_symbol:
                     if (
                         order.is_closed
-                        and order.exchange_update_time_point is not None
-                        and (latest_exchange_update_time_point is None or order.exchange_update_time_point > latest_exchange_update_time_point)
+                        and order.local_update_time_point is not None
+                        and (latest_local_update_time_point is None or order.local_update_time_point > latest_local_update_time_point)
                     ):
-                        latest_exchange_update_time_point = order.exchange_update_time_point
+                        latest_local_update_time_point = order.local_update_time_point
 
-                if latest_exchange_update_time_point is not None:
-                    earliest_exchange_update_time_point_to_keep = latest_exchange_update_time_point[0] - self.keep_historical_order_seconds
-                    self.orders[symbol] = {
-                        client_order_id: order
-                        for client_order_id, order in self.orders[symbol].items()
+                if latest_local_update_time_point is not None:
+                    earliest_local_update_time_point_to_keep = latest_local_update_time_point[0] - self.keep_historical_order_seconds
+                    self.orders[symbol] = [
+                        order
+                        for order in self.orders[symbol]
                         if not order.is_closed
-                        or (order.exchange_update_time_point is not None and order.exchange_update_time_point[0] >= earliest_exchange_update_time_point_to_keep)
-                    }
+                        or (order.local_update_time_point is not None and order.local_update_time_point[0] >= earliest_local_update_time_point_to_keep)
+                    ]
 
-        Exchange.logger.debug("self.orders", self.orders)
+        self.logger.debug("self.orders", self.orders)
 
     def remove_fills(self):
-        Exchange.logger.trace("self.fills", self.fills)
+        self.logger.trace("self.fills", self.fills)
 
         if self.keep_historical_fill_seconds:
             for symbol, fills_for_symbol in self.fills.items():
@@ -2186,7 +2241,7 @@ class Exchange(ExchangeApi):
                     if head_exchange_update_time_point < earliest_exchange_update_time_point_to_keep:
                         self.fills[symbol] = [x for x in fills_for_symbol if x.exchange_update_time_point[0] >= earliest_exchange_update_time_point_to_keep]
 
-        Exchange.logger.debug("self.fills", self.fills)
+        self.logger.debug("self.fills", self.fills)
 
     def generate_next_rest_request_id(self):
         self.next_rest_request_id_int += 1

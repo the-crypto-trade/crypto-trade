@@ -12,14 +12,15 @@ from math import ceil, floor
 
 
 class LogLevel(IntEnum):
-    TRACE = 1
-    DEBUG = 2
-    DETAIL = 3
-    INFO = 4
-    WARNING = 5
-    ERROR = 6
-    CRITICAL = 7
-    NONE = 8
+    TRACE = 10
+    DEBUG = 20
+    FINE = 30
+    DETAIL = 40
+    INFO = 50
+    WARNING = 60
+    ERROR = 70
+    CRITICAL = 80
+    NONE = 90
 
 
 class LoggerApi:
@@ -28,6 +29,9 @@ class LoggerApi:
         raise NotImplementedError
 
     def debug(self, *messages: str) -> None:
+        raise NotImplementedError
+
+    def fine(self, *messages: str) -> None:
         raise NotImplementedError
 
     def detail(self, *messages: str) -> None:
@@ -47,9 +51,9 @@ class LoggerApi:
 
 
 class Logger(LoggerApi):
-    def __init__(self, *, name="", level=LogLevel.WARNING):
-        self.name = name
+    def __init__(self, *, level, name):
         self.level = level
+        self.name = name
         self.message_format = "{} {} {{{}:{}:{}}} {}"
         self.separator = "\n"
 
@@ -62,6 +66,8 @@ class Logger(LoggerApi):
             or isinstance(object, WebsocketRequest)
         ):
             return pprint.pformat(object.as_pretty_dict(), width=width)
+        elif isinstance(object, str) or isinstance(object, int) or isinstance(object, float) or isinstance(object, bool):
+            return str(object)
         else:
             return pprint.pformat(object, width=width)
 
@@ -71,8 +77,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -86,8 +92,23 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                )
+            )
+
+    def fine(self, *messages: str) -> None:
+        if self.level <= LogLevel.FINE:
+            this_function = getframeinfo(stack()[0][0])
+            caller = getframeinfo(stack()[1][0])
+            print(
+                self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -101,8 +122,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -116,8 +137,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -131,8 +152,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -146,8 +167,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
@@ -163,8 +184,8 @@ class Logger(LoggerApi):
             caller = getframeinfo(stack()[1][0])
             print(
                 self.message_format.format(
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     self.name,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,

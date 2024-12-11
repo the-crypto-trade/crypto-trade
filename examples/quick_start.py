@@ -18,13 +18,12 @@ from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 async def main():
     try:
         # Default log level is WARNING. Here is how to change it:
-        # logger = Logger(name="crypto_trade", level=LogLevel.TRACE)
+        # logger = Logger(level=LogLevel.TRACE, name="crypto_trade")
         # Exchange.set_logger(logger)
 
         symbol = "BTC-USDT"
         instrument_type = OkxInstrumentType.SPOT  # OkxInstrumentType.MARGIN
-        margin_type = None  # MarginType.ISOLATED, MarginType.CROSS
-        okx = Okx(
+        exchange = Okx(
             instrument_type=instrument_type,
             symbols={symbol},  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
             subscribe_bbo=True,
@@ -38,53 +37,54 @@ async def main():
             # fetch_historical_fill_at_start=True,
             # subscribe_position=True,
             # subscribe_balance=True,
-            is_demo_trading=True,  # https://www.okx.com/docs-v5/en/#overview-demo-trading-services
+            is_demo_trading=True,  # https://www.exchange.com/docs-v5/en/#overview-demo-trading-services
             api_key=os.environ.get("OKX_API_KEY", ""),
             api_secret=os.environ.get("OKX_API_SECRET", ""),
             api_passphrase=os.environ.get("OKX_API_PASSPHRASE", ""),
-            margin_type=margin_type,
             # trade_api_method_preference = ApiMethod.WEBSOCKET,
         )
 
-        await okx.start()
+        await exchange.start()
 
-        pprint.pp(okx.bbos)
+        pprint.pp(exchange.bbos)
         print("\n")
 
         client_order_id = str(int(time.time() * 1000))
-        await okx.create_order(
+        margin_type = None  # MarginType.ISOLATED, MarginType.CROSS
+        await exchange.create_order(
             order=Order(
                 symbol=symbol,
                 client_order_id=client_order_id,
                 is_buy=True,
                 price="10000",
-                quantity=okx.all_instrument_information[symbol].order_quantity_min,
+                quantity=exchange.all_instrument_information[symbol].order_quantity_min,
+                margin_type=margin_type,
                 # extra_params={"ccy": "USDT"},  # Extra parameters to pass through to the exchange's underlying API
             )
         )
 
-        pprint.pp(okx.orders)
+        pprint.pp(exchange.orders)
         print("\n")
         # If the websocket order update message comes before the rest order acknowledgement response, the printed
         # order status will be NEW, otherwise the order status will be CREATE_ACKNOWLEDGED.
 
         await asyncio.sleep(1)
 
-        pprint.pp(okx.orders)
+        pprint.pp(exchange.orders)
         print("\n")
 
-        await okx.cancel_order(symbol=symbol, client_order_id=client_order_id)
+        await exchange.cancel_order(symbol=symbol, client_order_id=client_order_id)
 
-        pprint.pp(okx.orders)
+        pprint.pp(exchange.orders)
         print("\n")
         # If the websocket order update message comes before the rest order acknowledgement response, the printed
         # order status will be CANCELED, otherwise the order status will be CANCEL_ACKNOWLEDGED.
 
         await asyncio.sleep(1)
 
-        pprint.pp(okx.orders)
+        pprint.pp(exchange.orders)
 
-        await okx.stop()
+        await exchange.stop()
         asyncio.get_running_loop().stop()
 
     except Exception:
