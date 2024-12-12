@@ -38,10 +38,7 @@ def test_start_stop():
     loop = uvloop.new_event_loop()  # pylint: disable=possibly-used-before-assignment
     asyncio.set_event_loop(loop)
     loop.create_task(main())
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        loop.stop()
+    loop.run_forever()
 
 
 if __name__ == "__main__":

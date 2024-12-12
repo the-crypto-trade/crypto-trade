@@ -58,15 +58,9 @@ class Logger(LoggerApi):
         self.separator = "\n"
 
     def pretty_format(self, object, width=160):
-        if (
-            isinstance(object, RestRequest)
-            or isinstance(object, RestResponse)
-            or isinstance(object, WebsocketConnection)
-            or isinstance(object, WebsocketMessage)
-            or isinstance(object, WebsocketRequest)
-        ):
+        if isinstance(object, (RestRequest, RestResponse, WebsocketConnection, WebsocketMessage, WebsocketRequest)):
             return pprint.pformat(object.as_pretty_dict(), width=width)
-        elif isinstance(object, str) or isinstance(object, int) or isinstance(object, float) or isinstance(object, bool):
+        elif isinstance(object, (bool, str, int, float, type(None))):
             return str(object)
         else:
             return pprint.pformat(object, width=width)
@@ -447,3 +441,7 @@ def create_url_with_query_string(*, base_url, path, query_string):
 
 def remove_leading_negative_sign_in_string(*, input):
     return input[1:] if input.startswith("-") else input
+
+
+def normalize_decimal_string(*, input):
+    return input.rstrip("0").rstrip(".") if "." in input and input[-1] == "0" else input

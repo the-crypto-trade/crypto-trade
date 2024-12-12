@@ -96,7 +96,4 @@ if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.create_task(main())
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        asyncio.get_running_loop().stop()
+    loop.run_forever()
