@@ -47,9 +47,11 @@ For developers:
 
     pip install '.[dev]'
 
-## Public API
+## API
+* The following has API backward compatibility guarantee.
 * [Initialize: see the constructor in class ExchangeBase.](src/crypto_trade/core/exchanges/exchange_base.py)
 * [Call: see the methods in class ExchangeInterface.](src/crypto_trade/core/exchanges/exchange_interface.py)
+* All variables and functions are public.
 
 ## Examples
 * [Quick start](examples/quick_start.py)
