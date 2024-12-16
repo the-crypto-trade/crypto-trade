@@ -49,6 +49,8 @@ class Okx(Exchange):
         super().__init__(name="okx", **kwargs)
 
         self.rest_market_data_base_url = "https://www.okx.com"
+        if self.is_demo_trading:
+            self.rest_market_data_base_url = "https://eea.okx.com"
         self.rest_account_base_url = self.rest_market_data_base_url
         self.rest_market_data_fetch_all_instrument_information_path = "/api/v5/public/instruments"
         self.rest_market_data_fetch_bbo_path = "/api/v5/market/tickers"
@@ -66,9 +68,9 @@ class Okx(Exchange):
         self.rest_account_fetch_historical_fill_path_2 = "/api/v5/trade/fills-history"
 
         self.websocket_market_data_base_url = "wss://ws.okx.com:8443"
-        self.websocket_account_base_url = self.websocket_market_data_base_url
         if self.is_demo_trading:
-            self.websocket_account_base_url = "wss://wspap.okx.com:8443"
+            self.websocket_market_data_base_url = "wss://wspap.okx.com:8443"
+        self.websocket_account_base_url = self.websocket_market_data_base_url
         self.websocket_market_data_path = "/ws/v5/public"
         self.websocket_market_data_path_2 = "/ws/v5/business"
         self.websocket_market_data_channel_bbo = "bbo-tbt"
