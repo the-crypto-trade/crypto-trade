@@ -166,9 +166,11 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{repr(exception)}{10*' '}{traceback.format_exc()}\n",
+                    f"{this_function.function.upper()}\n",
                 )
             )
+            print(exception)
+            print(traceback.format_exc())
             if os.environ.get("CRYPTO_TRADE_TEST_FLAG"):
                 sys.exit("exit")
 
@@ -183,9 +185,11 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{repr(exception)}{10*' '}{traceback.format_exc()}\n",
+                    f"{this_function.function.upper()}\n",
                 )
             )
+            print(exception)
+            print(traceback.format_exc())
             sys.exit("exit")
 
 

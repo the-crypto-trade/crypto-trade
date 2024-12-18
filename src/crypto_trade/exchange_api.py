@@ -883,7 +883,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_rest_account_fetch_balance())
 
-        if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start):
+        if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start) and self.trades:
 
             async def start_periodic_remove_historical_trade():
                 try:
@@ -895,7 +895,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_trade())
 
-        if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start):
+        if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start) and self.ohlcvs:
 
             async def start_periodic_remove_historical_ohlcv():
                 try:
@@ -907,7 +907,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_ohlcv())
 
-        if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start):
+        if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start) and self.orders:
 
             async def start_periodic_remove_historical_order():
                 try:
@@ -919,7 +919,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_order())
 
-        if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start):
+        if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start) and self.fills:
 
             async def start_periodic_remove_historical_fill():
                 try:
