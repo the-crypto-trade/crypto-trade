@@ -1031,7 +1031,7 @@ class Exchange(ExchangeApi):
     def create_order_ensure_client_order_id(self, *, order):
         if not order.client_order_id:
             return dataclasses.replace(
-                order, exchange_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT, client_order_id=self.generate_next_client_order_id()
+                order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT, client_order_id=self.generate_next_client_order_id()
             )
         else:
             return dataclasses.replace(order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT)
@@ -2138,7 +2138,7 @@ class Exchange(ExchangeApi):
                     status=status,
                 )
         else:
-            self.append_order(order=order)
+            self.append_order(order=dataclasses.replace(order, local_update_time_point=time_point_now()))
 
     def get_open_orders(self):
         open_orders = {}

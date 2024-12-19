@@ -263,8 +263,8 @@ class Okx(Exchange):
             InstrumentInformation(
                 api_method=ApiMethod.REST,
                 symbol=x["instId"],
-                base_asset=x["baseCcy"],
-                quote_asset=x["quoteCcy"],
+                base_asset=x["baseCcy"] if x["baseCcy"] else x["instFamily"].split("-")[0],
+                quote_asset=x["quoteCcy"] if x["quoteCcy"] else x["instFamily"].split("-")[1],
                 order_price_increment=normalize_decimal_string(input=x["tickSz"]),
                 order_quantity_increment=normalize_decimal_string(input=x["lotSz"]),
                 order_quantity_min=normalize_decimal_string(input=x["minSz"]),
