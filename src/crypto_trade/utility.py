@@ -350,6 +350,10 @@ def unix_timestamp_seconds_now():
     return int(time.time())
 
 
+def unix_timestamp_seconds_now_as_float():
+    return time.time()
+
+
 def time_point_subtract(*, time_point_1, time_point_2):
     time_point_delta = (time_point_1[0] - time_point_2[0], time_point_1[1] - time_point_2[1])
     return time_point_delta

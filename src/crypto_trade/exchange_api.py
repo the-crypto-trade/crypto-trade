@@ -82,14 +82,14 @@ class ExchangeApi:
 
 
 @dataclass(frozen=True, kw_only=True)
-class ModelBase:
+class BaseModel:
     api_method: Optional[str] = None
     symbol: Optional[str] = None
     exchange_update_time_point: Optional[Tuple[int, int]] = None
 
 
 @dataclass(frozen=True, kw_only=True)
-class InstrumentInformation(ModelBase):
+class InstrumentInformation(BaseModel):
     base_asset: Optional[str] = None
     quote_asset: Optional[str] = None
     order_price_increment: Optional[str] = None
@@ -171,7 +171,7 @@ class InstrumentInformation(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Bbo(ModelBase):
+class Bbo(BaseModel):
     best_bid_price: Optional[str] = None
     best_bid_size: Optional[str] = None
     best_ask_price: Optional[str] = None
@@ -225,7 +225,7 @@ class Bbo(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Trade(ModelBase):
+class Trade(BaseModel):
     trade_id: Optional[str] = None
     price: Optional[str] = None
     size: Optional[str] = None
@@ -253,7 +253,7 @@ class Trade(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Ohlcv(ModelBase):
+class Ohlcv(BaseModel):
     start_unix_timestamp_seconds: Optional[int] = None
     open_price: Optional[str] = None
     high_price: Optional[str] = None
@@ -326,7 +326,7 @@ class OrderStatus(IntEnum):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Order(ModelBase):
+class Order(BaseModel):
     order_id: Optional[str] = None
     client_order_id: Optional[str] = None
     is_buy: Optional[bool] = None
@@ -428,13 +428,14 @@ class Order(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Fill(ModelBase):
+class Fill(BaseModel):
     order_id: Optional[str] = None
     client_order_id: Optional[str] = None
     trade_id: Optional[str] = None
     is_buy: Optional[bool] = None
     price: Optional[str] = None
     quantity: Optional[str] = None
+    is_maker: Optional[bool] = None
 
     fee_asset: Optional[str] = None
     fee_quantity: Optional[str] = None
@@ -470,7 +471,7 @@ class Fill(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Position(ModelBase):
+class Position(BaseModel):
     margin_type: Optional[MarginType] = None
     quantity: Optional[str] = None
     is_long: Optional[bool] = None
@@ -524,7 +525,7 @@ class Position(ModelBase):
 
 
 @dataclass(frozen=True, kw_only=True)
-class Balance(ModelBase):
+class Balance(BaseModel):
     quantity: Optional[str] = None  # wallet balance
 
     @cached_property

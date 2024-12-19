@@ -919,6 +919,7 @@ class Okx(Exchange):
             is_buy=input["side"] == "buy",
             price=input["fillPx"],
             quantity=input["fillSz"],
+            is_maker=input["execType"] == "M" if input.get("execType") else None,
             fee_asset=fill_fee_ccy,
             fee_quantity=remove_leading_negative_sign_in_string(input=fill_fee),
             is_rebate=is_rebate,
