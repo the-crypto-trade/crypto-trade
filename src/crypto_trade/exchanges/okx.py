@@ -49,8 +49,6 @@ class Okx(Exchange):
         super().__init__(name="okx", **kwargs)
 
         self.rest_market_data_base_url = "https://www.okx.com"
-        if self.is_demo_trading:
-            self.rest_market_data_base_url = "https://eea.okx.com"
         self.rest_account_base_url = self.rest_market_data_base_url
         self.rest_market_data_fetch_all_instrument_information_path = "/api/v5/public/instruments"
         self.rest_market_data_fetch_bbo_path = "/api/v5/market/tickers"
@@ -701,7 +699,7 @@ class Okx(Exchange):
 
     def is_websocket_response_success(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
-        return payload_summary["event"] != "error" or payload_summary["code"] == "0"
+        return (payload_summary["event"] and payload_summary["event"] != "error") or payload_summary["code"] == "0"
 
     def is_websocket_response_for_create_order(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
