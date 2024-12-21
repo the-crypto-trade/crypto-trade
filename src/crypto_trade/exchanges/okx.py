@@ -135,7 +135,7 @@ class Okx(Exchange):
 
         return self.rest_market_data_create_get_request_function(
             path=self.rest_market_data_fetch_bbo_path,
-            query_params={"instType": f"{OkxInstrumentType.SPOT if self.instrument_type ==OkxInstrumentType.MARGIN else self.instrument_type}"},
+            query_params={"instType": f"{OkxInstrumentType.SPOT if self.instrument_type == OkxInstrumentType.MARGIN else self.instrument_type}"},
         )
 
     def rest_market_data_fetch_historical_trade_create_rest_request_function(self, *, symbol):
@@ -510,11 +510,13 @@ class Okx(Exchange):
                 and rest_response.json_deserialized_payload
                 and rest_response.json_deserialized_payload.get("code") in {"51001", "51603"}
             ):
+                now_time_point = time_point_now()
                 self.replace_order(
                     symbol=rest_response.rest_request.query_params["instId"],
                     order_id=rest_response.rest_request.query_params.get("ordId"),
                     client_order_id=rest_response.rest_request.query_params.get("clOrdId"),
-                    exchange_update_time_point=time_point_now(),
+                    exchange_update_time_point=now_time_point,
+                    local_update_time_point=now_time_point,
                     status=OrderStatus.REJECTED,
                 )
 
@@ -561,6 +563,7 @@ class Okx(Exchange):
 
     def websocket_connection_ping_on_application_level_create_websocket_request(self):
         payload = "ping"
+        self.logger.trace("send application level ping")
         return self.websocket_create_request(payload=payload)
 
     def websocket_login_create_websocket_request(self, *, time_point):
@@ -650,6 +653,8 @@ class Okx(Exchange):
         # "pong" isn't valid json, only "\"pong\"" is valid json
         if raw_websocket_message_data != "pong":
             await super().websocket_on_message(websocket_connection=websocket_connection, raw_websocket_message_data=raw_websocket_message_data)
+        else:
+            self.logger.trace("received application level pong")
 
     def websocket_on_message_extract_data(self, *, websocket_message):
         json_deserialized_payload = websocket_message.json_deserialized_payload

@@ -1012,7 +1012,6 @@ class Exchange(ExchangeApi):
 
         self.append_order(order=order_to_create)
 
-        order_to_create = self.create_order_ensure_client_order_id(order=order_to_create)
         if (
             (trade_api_method_preference is None and (self.trade_api_method_preference is None or self.trade_api_method_preference == ApiMethod.REST))
             or trade_api_method_preference == ApiMethod.REST
@@ -1683,6 +1682,7 @@ class Exchange(ExchangeApi):
 
         if not websocket_connection.connection.closed and websocket_request and websocket_request.payload:
             self.websocket_requests[websocket_request.id] = websocket_request
+            self.logger.debug("about to websocket_connection.connection.send_str")
             await websocket_connection.connection.send_str(websocket_request.payload)
 
     async def websocket_on_message(self, *, websocket_connection, raw_websocket_message_data):
