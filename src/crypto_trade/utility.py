@@ -51,32 +51,36 @@ class LoggerApi:
 
 
 class Logger(LoggerApi):
-    def __init__(self, *, level, name):
+    def __init__(self, *, level, name, sep="\n", end="\n\n"):
         self.level = level
         self.name = name
         self.message_format = "{} {} {{{}:{}:{}}} {}"
-        self.separator = "\n"
+        self.sep = sep
+        self.end = end
 
     def pretty_format(self, object, width=160):
-        if isinstance(object, (RestRequest, RestResponse, WebsocketConnection, WebsocketMessage, WebsocketRequest)):
-            return pprint.pformat(object.as_pretty_dict(), width=width)
-        elif isinstance(object, (bool, str, int, float, type(None))):
+        if isinstance(object, (bool, str, int, float, type(None))):
             return str(object)
+        elif isinstance(object, (RestRequest, RestResponse, WebsocketConnection, WebsocketMessage, WebsocketRequest)):
+            return pprint.pformat(object.as_pretty_dict(), width=width)
         else:
             return pprint.pformat(object, width=width)
+
+    def print(self, message):
+        print(message, sep=self.sep, end=self.end)
 
     def trace(self, *messages: str) -> None:
         if self.level <= LogLevel.TRACE:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -84,14 +88,14 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.DEBUG:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -99,14 +103,14 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.FINE:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -114,14 +118,14 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.DETAIL:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -129,14 +133,14 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.INFO:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -144,14 +148,14 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.WARNING:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.separator.join((self.pretty_format(x) for x in messages))}\n",
+                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
                 )
             )
 
@@ -159,18 +163,18 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.ERROR:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}\n",
+                    f"{this_function.function.upper()}",
                 )
             )
-            print(exception)
-            print(traceback.format_exc())
+            self.print(exception)
+            self.print(traceback.format_exc())
             if os.environ.get("CRYPTO_TRADE_TEST_FLAG"):
                 sys.exit("exit")
 
@@ -178,18 +182,18 @@ class Logger(LoggerApi):
         if self.level <= LogLevel.CRITICAL:
             this_function = getframeinfo(stack()[0][0])
             caller = getframeinfo(stack()[1][0])
-            print(
+            self.print(
                 self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"{this_function.function.upper()}\n",
+                    f"{this_function.function.upper()}",
                 )
             )
-            print(exception)
-            print(traceback.format_exc())
+            self.print(exception)
+            self.print(traceback.format_exc())
             sys.exit("exit")
 
 
