@@ -51,14 +51,152 @@ class LoggerApi:
 
 
 class Logger(LoggerApi):
-    def __init__(self, *, level, name, sep="\n", end="\n\n"):
+    def __init__(self, *, level, name, datetime_format="%Y-%m-%dT%H:%M:%S.%fZ", sep="\n", end="\n\n", width=160):
         self.level = level
         self.name = name
         self.message_format = "{} {} {{{}:{}:{}}} {}"
+        self.datetime_format = datetime_format
         self.sep = sep
         self.end = end
+        self.width = width
+        self.whitespaces = 10 * " "
 
-    def pretty_format(self, object, width=160):
+    def trace(self, *messages: str) -> None:
+        if self.level <= LogLevel.TRACE:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"TRACE{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def debug(self, *messages: str) -> None:
+        if self.level <= LogLevel.DEBUG:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"DEBUG{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def fine(self, *messages: str) -> None:
+        if self.level <= LogLevel.FINE:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"FINE{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def detail(self, *messages: str) -> None:
+        if self.level <= LogLevel.DETAIL:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"DETAIL{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def info(self, *messages: str) -> None:
+        if self.level <= LogLevel.INFO:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"INFO{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def warning(self, *messages: str) -> None:
+        if self.level <= LogLevel.WARNING:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    f"WARNING{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                ),
+            )
+
+    def error(self, exception: Exception) -> None:
+        if self.level <= LogLevel.ERROR:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    "ERROR",
+                ),
+            )
+            self.write(current_datetime_str=current_datetime_str, message=repr(exception))
+            self.write(current_datetime_str=current_datetime_str, message=traceback.format_exc())
+            if os.environ.get("CRYPTO_TRADE_TEST_FLAG"):
+                sys.exit("exit")
+
+    def critical(self, exception: Exception) -> None:
+        if self.level <= LogLevel.CRITICAL:
+            current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
+            caller = getframeinfo(stack()[1][0])
+            self.write(
+                current_datetime_str=current_datetime_str,
+                message=self.message_format.format(
+                    self.name,
+                    datetime.now(timezone.utc).strftime(self.datetime_format),
+                    os.path.basename(caller.filename),
+                    caller.function,
+                    caller.lineno,
+                    "CRITICAL",
+                ),
+            )
+            self.write(current_datetime_str=current_datetime_str, message=repr(exception))
+            self.write(current_datetime_str=current_datetime_str, message=traceback.format_exc())
+            sys.exit("exit")
+
+    def pretty_format(self, *, object, width):
         if isinstance(object, (bool, str, int, float, type(None))):
             return str(object)
         elif isinstance(object, (RestRequest, RestResponse, WebsocketConnection, WebsocketMessage, WebsocketRequest)):
@@ -66,135 +204,9 @@ class Logger(LoggerApi):
         else:
             return pprint.pformat(object, width=width)
 
-    def print(self, message):
-        print(message, sep=self.sep, end=self.end)
-
-    def trace(self, *messages: str) -> None:
-        if self.level <= LogLevel.TRACE:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def debug(self, *messages: str) -> None:
-        if self.level <= LogLevel.DEBUG:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def fine(self, *messages: str) -> None:
-        if self.level <= LogLevel.FINE:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def detail(self, *messages: str) -> None:
-        if self.level <= LogLevel.DETAIL:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def info(self, *messages: str) -> None:
-        if self.level <= LogLevel.INFO:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def warning(self, *messages: str) -> None:
-        if self.level <= LogLevel.WARNING:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}{10*' '}{self.sep.join((self.pretty_format(x) for x in messages))}",
-                )
-            )
-
-    def error(self, exception: Exception) -> None:
-        if self.level <= LogLevel.ERROR:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}",
-                )
-            )
-            self.print(exception)
-            self.print(traceback.format_exc())
-            if os.environ.get("CRYPTO_TRADE_TEST_FLAG"):
-                sys.exit("exit")
-
-    def critical(self, exception: Exception) -> None:
-        if self.level <= LogLevel.CRITICAL:
-            this_function = getframeinfo(stack()[0][0])
-            caller = getframeinfo(stack()[1][0])
-            self.print(
-                self.message_format.format(
-                    self.name,
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
-                    f"{this_function.function.upper()}",
-                )
-            )
-            self.print(exception)
-            self.print(traceback.format_exc())
-            sys.exit("exit")
+    def write(self, *, current_datetime_str, message):
+        sys.stdout.write(message)
+        sys.stdout.write(self.end)
 
 
 class RestRequest:

@@ -22,6 +22,7 @@ dev = [
     "black",
     "isort",
     "autoflake",
+    "autopep8",
     "flake8",
     "mypy",
     "pylint",
