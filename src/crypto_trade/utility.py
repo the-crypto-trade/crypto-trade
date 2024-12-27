@@ -73,7 +73,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"TRACE{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"TRACE{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -89,7 +89,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"DEBUG{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"DEBUG{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -105,7 +105,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"FINE{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"FINE{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -121,7 +121,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"DETAIL{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"DETAIL{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -137,7 +137,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"INFO{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"INFO{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -153,7 +153,7 @@ class Logger(LoggerApi):
                     os.path.basename(caller.filename),
                     caller.function,
                     caller.lineno,
-                    f"WARNING{self.whitespaces}{self.sep.join((self.pretty_format(object=x, width=self.width) for x in messages))}",
+                    f"WARNING{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
 
@@ -196,11 +196,11 @@ class Logger(LoggerApi):
             self.write(current_datetime_str=current_datetime_str, message=traceback.format_exc())
             sys.exit("exit")
 
-    def pretty_format(self, *, object, width):
+    def serialize(self, *, object, width):
         if isinstance(object, (bool, str, int, float, type(None))):
             return str(object)
         elif isinstance(object, (RestRequest, RestResponse, WebsocketConnection, WebsocketMessage, WebsocketRequest)):
-            return pprint.pformat(object.as_pretty_dict(), width=width)
+            return pprint.pformat(object.as_readable_dict(), width=width)
         else:
             return pprint.pformat(object, width=width)
 
@@ -252,7 +252,7 @@ class RestRequest:
             self.payload = payload
         self.extra_data = extra_data
 
-    def as_pretty_dict(self):
+    def as_readable_dict(self):
         return self.__dict__
 
     @property
@@ -286,13 +286,13 @@ class RestResponse:
         self.next_rest_request_function = next_rest_request_function
         self.next_rest_request_delay_seconds = next_rest_request_delay_seconds
 
-    def as_pretty_dict(self):
+    def as_readable_dict(self):
         return {
             "status_code": self.status_code,
             "payload": self.payload,
             "headers": dict(self.headers),
             "json_deserialized_payload": self.json_deserialized_payload,
-            "rest_request": self.rest_request.as_pretty_dict() if self.rest_request else None,
+            "rest_request": self.rest_request.as_readable_dict() if self.rest_request else None,
             "has_next_rest_request_function": self.next_rest_request_function is not None,
             "next_rest_request_delay_seconds": self.next_rest_request_delay_seconds,
         }
@@ -306,7 +306,7 @@ class WebsocketConnection:
         self.connection = connection
         self.latest_receive_message_time_point = None
 
-    def as_pretty_dict(self):
+    def as_readable_dict(self):
         return {
             "base_url": self.base_url,
             "path": self.path,
@@ -330,14 +330,14 @@ class WebsocketMessage:
         self.websocket_request_id = websocket_request_id
         self.websocket_request = websocket_request
 
-    def as_pretty_dict(self):
+    def as_readable_dict(self):
         return {
-            "websocket_connection": self.websocket_connection.as_pretty_dict() if self.websocket_connection else None,
+            "websocket_connection": self.websocket_connection.as_readable_dict() if self.websocket_connection else None,
             "payload": self.payload,
             "json_deserialized_payload": self.json_deserialized_payload,
             "payload_summary": self.payload_summary,
             "websocket_request_id": self.websocket_request_id,
-            "websocket_request": self.websocket_request.as_pretty_dict() if self.websocket_request else None,
+            "websocket_request": self.websocket_request.as_readable_dict() if self.websocket_request else None,
         }
 
 
@@ -351,7 +351,7 @@ class WebsocketRequest:
             self.payload = payload
         self.extra_data = extra_data
 
-    def as_pretty_dict(self):
+    def as_readable_dict(self):
         return self.__dict__
 
 

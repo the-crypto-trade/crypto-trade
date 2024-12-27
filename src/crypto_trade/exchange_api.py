@@ -31,7 +31,6 @@ from crypto_trade.utility import (
     create_url_with_query_params,
     time_point_now,
     time_point_subtract,
-    unix_timestamp_milliseconds_now,
     unix_timestamp_seconds_now,
 )
 
@@ -777,8 +776,9 @@ class Exchange(ExchangeApi):
 
         self.next_rest_request_id_int: int = 0
         self.next_websocket_request_id_int: int = 0
-        self.last_client_order_id_unix_timestamp_milliseconds: Optional[int] = None
+        self.last_client_order_id_unix_timestamp_seconds: Optional[int] = None
         self.last_client_order_id_sequence_number: Optional[int] = None
+        self.client_order_id_sequence_number_padding_length: int = 3
 
         self.websocket_connections: Dict[str, WebsocketConnection] = {}
         self.websocket_reconnect_delay_seconds: Dict[str, int] = {}
@@ -2253,15 +2253,16 @@ class Exchange(ExchangeApi):
         return str(self.next_websocket_request_id_int)
 
     def generate_next_client_order_id(self):
-        unix_timestamp_milliseconds = unix_timestamp_milliseconds_now()
+        unix_timestamp_seconds = unix_timestamp_seconds_now()
 
-        if self.last_client_order_id_unix_timestamp_milliseconds != unix_timestamp_milliseconds:
-            self.last_client_order_id_unix_timestamp_milliseconds = unix_timestamp_milliseconds
+        if self.last_client_order_id_unix_timestamp_seconds != unix_timestamp_seconds:
+            self.last_client_order_id_unix_timestamp_seconds = unix_timestamp_seconds
             self.last_client_order_id_sequence_number = 0
         else:
             self.last_client_order_id_sequence_number += 1
 
-        return f"{self.last_client_order_id_unix_timestamp_milliseconds}{str(self.last_client_order_id_sequence_number).zfill(3)}"
+        client_order_id_sequence_number_suffix = str(self.last_client_order_id_sequence_number).zfill(self.client_order_id_sequence_number_padding_length)
+        return f"{self.last_client_order_id_unix_timestamp_seconds}{client_order_id_sequence_number_suffix}"
 
     def create_task(self, *, coro):
         task = asyncio.create_task(coro)
