@@ -469,3 +469,10 @@ def remove_leading_negative_sign_in_string(*, input):
 
 def normalize_decimal_string(*, input):
     return input.rstrip("0").rstrip(".") if "." in input and input[-1] == "0" else input
+
+
+def convert_decimal_to_string(*, input, normalize=False):
+    output = "{0:f}".format(input)
+    if normalize:
+        output = normalize_decimal_string(input=output)
+    return output

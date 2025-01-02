@@ -339,6 +339,7 @@ class Order(BaseModel):
     is_reduce_only: Optional[bool] = False
 
     margin_type: Optional[MarginType] = None
+    margin_asset: Optional[str] = None
 
     extra_params: Optional[Dict[str, Any]] = None
 
@@ -424,6 +425,10 @@ class Order(BaseModel):
     @property
     def is_closed(self):
         return self.status >= OrderStatus.FILLED
+
+    @property
+    def is_eligible_to_cancel(self):
+        return not self.is_in_flight and self.status != OrderStatus.CANCEL_ACKNOWLEDGED and self.is_open
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -785,7 +790,6 @@ class Exchange(ExchangeApi):
         self.websocket_logged_in_connections: Set[str] = set()
         self.websocket_requests: Dict[str, WebsocketRequest] = {}
 
-        self.all_tasks: Set[asyncio.Task] = set()
         self.stopped = False
 
     async def start(self):
@@ -808,7 +812,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_market_data_fetch_all_instrument_information())
+            asyncio.create_task(coro=start_periodic_rest_market_data_fetch_all_instrument_information())
 
         if self.subscribe_bbo or self.rest_market_data_fetch_bbo_period_seconds:
             await self.rest_market_data_fetch_bbo()
@@ -823,7 +827,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
+            asyncio.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
 
         if self.subscribe_order or self.rest_account_fetch_open_order_at_start or self.rest_account_cancel_open_order_at_start:
             await self.rest_account_fetch_open_order()
@@ -840,7 +844,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_account_check_open_order())
+            asyncio.create_task(coro=start_periodic_rest_account_check_open_order())
 
         if self.rest_account_check_in_flight_order_period_seconds:
 
@@ -852,7 +856,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_account_check_in_flight_order())
+            asyncio.create_task(coro=start_periodic_rest_account_check_in_flight_order())
 
         if self.subscribe_position or self.rest_account_fetch_position_period_seconds:
             await self.rest_account_fetch_position()
@@ -867,7 +871,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_account_fetch_position())
+            asyncio.create_task(coro=start_periodic_rest_account_fetch_position())
 
         if self.subscribe_balance or self.rest_account_fetch_balance_period_seconds:
             await self.rest_account_fetch_balance()
@@ -882,7 +886,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_rest_account_fetch_balance())
+            asyncio.create_task(coro=start_periodic_rest_account_fetch_balance())
 
         if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start) and self.trades:
 
@@ -894,7 +898,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_remove_historical_trade())
+            asyncio.create_task(coro=start_periodic_remove_historical_trade())
 
         if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start) and self.ohlcvs:
 
@@ -906,7 +910,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_remove_historical_ohlcv())
+            asyncio.create_task(coro=start_periodic_remove_historical_ohlcv())
 
         if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start) and self.orders:
 
@@ -918,7 +922,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_remove_historical_order())
+            asyncio.create_task(coro=start_periodic_remove_historical_order())
 
         if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start) and self.fills:
 
@@ -930,7 +934,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_periodic_remove_historical_fill())
+            asyncio.create_task(coro=start_periodic_remove_historical_fill())
 
         await asyncio.gather(self.websocket_market_data_connect(), self.websocket_account_connect())
         await asyncio.gather(self.rest_market_data_fetch_historical_data(), self.rest_account_fetch_historical_data())
@@ -953,7 +957,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_websocket_connection_ping_on_application_level())
+            asyncio.create_task(coro=start_websocket_connection_ping_on_application_level())
 
         if self.websocket_connection_application_level_heartbeat_timeout_seconds:
 
@@ -980,7 +984,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            self.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
+            asyncio.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
 
         await asyncio.sleep(self.start_wait_seconds)
 
@@ -995,10 +999,11 @@ class Exchange(ExchangeApi):
             if not websocket_connection.connection.closed:
                 await websocket_connection.connection.close()
 
-        for task in self.all_tasks:
-            task.cancel()
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                task.cancel()
 
-        await asyncio.gather(*self.all_tasks, return_exceptions=True)
+        await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
 
         if self.close_client_session_at_stop:
             await self.client_session.close()
@@ -1036,7 +1041,9 @@ class Exchange(ExchangeApi):
             return dataclasses.replace(order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT)
 
     async def cancel_order(self, *, symbol, order_id=None, client_order_id=None, trade_api_method_preference=None):
-        self.replace_order(symbol=symbol, client_order_id=client_order_id, local_update_time_point=time_point_now(), status=OrderStatus.CANCEL_IN_FLIGHT)
+        self.replace_order(
+            symbol=symbol, order_id=order_id, client_order_id=client_order_id, local_update_time_point=time_point_now(), status=OrderStatus.CANCEL_IN_FLIGHT
+        )
 
         if (
             (trade_api_method_preference is None and (self.trade_api_method_preference is None or self.trade_api_method_preference == ApiMethod.REST))
@@ -1060,19 +1067,17 @@ class Exchange(ExchangeApi):
         if symbol:
             if symbol in self.orders:
                 for order in self.orders[symbol]:
-                    if not order.is_in_flight and order.is_open:
+                    if order.is_eligible_to_cancel:
                         await self.cancel_order(
                             symbol=symbol,
                             order_id=order.order_id,
                             client_order_id=order.client_order_id,
                             trade_api_method_preference=trade_api_method_preference,
                         )
-            else:
-                self.logger.warning(f"symbol {symbol} not found in self.orders", self.orders)
         else:
             for symbol, orders_for_symbol in self.orders.items():
                 for order in orders_for_symbol:
-                    if not order.is_in_flight and order.is_open:
+                    if order.is_eligible_to_cancel:
                         await self.cancel_order(
                             symbol=symbol,
                             order_id=order.order_id,
@@ -1209,7 +1214,7 @@ class Exchange(ExchangeApi):
                 if (
                     order.is_open
                     and convert_time_point_delta_to_seconds(
-                        time_point_delta=time_point_subtract(time_point_1=now_time_point, time_point_2=order.exchange_update_time_point)
+                        time_point_delta=time_point_subtract(time_point_1=now_time_point, time_point_2=order.local_update_time_point)
                     )
                     > self.rest_account_check_open_order_threshold_seconds
                 ):
@@ -1223,7 +1228,7 @@ class Exchange(ExchangeApi):
                 if (
                     order.is_in_flight
                     and convert_time_point_delta_to_seconds(
-                        time_point_delta=time_point_subtract(time_point_1=now_time_point, time_point_2=order.exchange_update_time_point)
+                        time_point_delta=time_point_subtract(time_point_1=now_time_point, time_point_2=order.local_update_time_point)
                     )
                     > self.rest_account_check_in_flight_order_threshold_seconds
                 ):
@@ -1749,7 +1754,7 @@ class Exchange(ExchangeApi):
 
     async def websocket_market_data_connect(self):
         if self.symbols and (self.subscribe_bbo or self.subscribe_trade or self.subscribe_ohlcv):
-            self.create_task(
+            asyncio.create_task(
                 coro=self.start_websocket_connect(
                     base_url=self.websocket_market_data_base_url, path=self.websocket_market_data_path, query_params=self.websocket_market_data_query_params
                 )
@@ -1767,7 +1772,7 @@ class Exchange(ExchangeApi):
 
     async def websocket_account_connect(self):
         if self.subscribe_order or self.subscribe_fill or self.subscribe_position or self.subscribe_balance:
-            self.create_task(
+            asyncio.create_task(
                 coro=self.start_websocket_connect(
                     base_url=self.websocket_account_base_url, path=self.websocket_account_path, query_params=self.websocket_account_query_params
                 )
@@ -2014,7 +2019,7 @@ class Exchange(ExchangeApi):
             except Exception as exception:
                 self.logger.error(exception)
 
-        self.create_task(coro=start_reset_websocket_reconnect_delay())
+        asyncio.create_task(coro=start_reset_websocket_reconnect_delay())
 
     def generate_next_websocket_reconnect_delay_seconds(self, *, url_with_query_params):
         if url_with_query_params not in self.websocket_reconnect_delay_seconds:
@@ -2040,7 +2045,7 @@ class Exchange(ExchangeApi):
             (
                 (index, order)
                 for index, order in enumerate(orders_for_symbol)
-                if (order.order_id == order_id if order_id else order.client_order_id == client_order_id)
+                if (order.client_order_id == client_order_id if client_order_id else order.order_id == order_id)
             ),
             None,
         )
@@ -2058,7 +2063,6 @@ class Exchange(ExchangeApi):
 
     def update_order(self, *, order):
         index_and_order_to_update = self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)
-
         if index_and_order_to_update:
             index, order_to_update = index_and_order_to_update
             exchange_update_time_point = order_to_update.exchange_update_time_point
@@ -2102,6 +2106,7 @@ class Exchange(ExchangeApi):
                 is_reduce_only = order_to_update.is_reduce_only
 
                 margin_type = order_to_update.margin_type
+                margin_asset = order_to_update.margin_asset
 
                 cumulative_filled_quantity = order_to_update.cumulative_filled_quantity
                 cumulative_filled_quote_quantity = order_to_update.cumulative_filled_quote_quantity
@@ -2131,6 +2136,7 @@ class Exchange(ExchangeApi):
                     is_ioc=is_ioc,
                     is_reduce_only=is_reduce_only,
                     margin_type=margin_type,
+                    margin_asset=margin_asset,
                     cumulative_filled_quantity=cumulative_filled_quantity,
                     cumulative_filled_quote_quantity=cumulative_filled_quote_quantity,
                     exchange_create_time_point=exchange_create_time_point,
@@ -2263,8 +2269,3 @@ class Exchange(ExchangeApi):
 
         client_order_id_sequence_number_suffix = str(self.last_client_order_id_sequence_number).zfill(self.client_order_id_sequence_number_padding_length)
         return f"{self.last_client_order_id_unix_timestamp_seconds}{client_order_id_sequence_number_suffix}"
-
-    def create_task(self, *, coro):
-        task = asyncio.create_task(coro)
-        self.all_tasks.add(task)
-        task.add_done_callback(self.all_tasks.discard)

@@ -499,11 +499,19 @@ class Okx(Exchange):
         self.logger.warning("rest_response", rest_response)
 
         if self.is_rest_response_for_create_order(rest_response=rest_response) or self.is_rest_response_for_cancel_order(rest_response=rest_response):
-            await self.rest_account_fetch_order(
-                symbol=rest_response.rest_request.json_payload["instId"],
-                order_id=rest_response.rest_request.json_payload.get("ordId"),
-                client_order_id=rest_response.rest_request.json_payload.get("clOrdId"),
-            )
+
+            async def start_rest_account_fetch_order():
+                try:
+                    await self.rest_account_fetch_order(
+                        symbol=rest_response.rest_request.json_payload["instId"],
+                        order_id=rest_response.rest_request.json_payload.get("ordId"),
+                        client_order_id=rest_response.rest_request.json_payload.get("clOrdId"),
+                    )
+                except Exception as exception:
+                    self.logger.error(exception)
+
+            asyncio.create_task(coro=start_rest_account_fetch_order())
+
         elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
             if (
                 rest_response.status_code == 200
@@ -524,7 +532,7 @@ class Okx(Exchange):
         if self.symbols:
 
             if self.subscribe_bbo or self.subscribe_trade:
-                self.create_task(
+                asyncio.create_task(
                     coro=self.start_websocket_connect(
                         base_url=self.websocket_market_data_base_url,
                         path=self.websocket_market_data_path,
@@ -533,7 +541,7 @@ class Okx(Exchange):
                 )
 
             if self.subscribe_ohlcv:
-                self.create_task(
+                asyncio.create_task(
                     coro=self.start_websocket_connect(
                         base_url=self.websocket_market_data_base_url,
                         path=self.websocket_market_data_path_2,
@@ -811,11 +819,18 @@ class Okx(Exchange):
         if self.is_websocket_response_for_create_order(websocket_message=websocket_message) or self.is_websocket_response_for_cancel_order(
             websocket_message=websocket_message
         ):
-            await self.rest_account_fetch_order(
-                symbol=websocket_message.websocket_request.json_payload["args"][0]["instId"],
-                order_id=websocket_message.websocket_request.json_payload["args"][0].get("ordId"),
-                client_order_id=websocket_message.websocket_request.json_payload["args"][0].get("clOrdId"),
-            )
+
+            async def start_rest_account_fetch_order():
+                try:
+                    await self.rest_account_fetch_order(
+                        symbol=websocket_message.websocket_request.json_payload["args"][0]["instId"],
+                        order_id=websocket_message.websocket_request.json_payload["args"][0].get("ordId"),
+                        client_order_id=websocket_message.websocket_request.json_payload["args"][0].get("clOrdId"),
+                    )
+                except Exception as exception:
+                    self.logger.error(exception)
+
+            asyncio.create_task(coro=start_rest_account_fetch_order())
 
     def account_create_order_create_json_payload(self, *, order):
         if order.is_market:
@@ -842,6 +857,8 @@ class Okx(Exchange):
             json_payload["px"] = order.price
         if order.is_reduce_only:
             json_payload["reduceOnly"] = True
+        if order.margin_asset:
+            json_payload["ccy"] = order.margin_asset
         if order.extra_params:
             json_payload.update(order.extra_params)
         return json_payload
@@ -901,6 +918,7 @@ class Okx(Exchange):
             is_ioc=input["ordType"] == "ioc",
             is_reduce_only=input["reduceOnly"] == "true",
             margin_type=MarginType[input["tdMode"].upper()] if input["tdMode"] != "cash" else None,
+            margin_asset=input["ccy"],
             cumulative_filled_quantity=input["accFillSz"] or None,
             cumulative_filled_quote_quantity="{0:f}".format(Decimal(input["avgPx"]) * Decimal(input["accFillSz"]) * contract_size) if input["avgPx"] else None,
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["cTime"]),
