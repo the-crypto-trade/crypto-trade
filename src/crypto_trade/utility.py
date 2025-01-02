@@ -7,7 +7,6 @@ import urllib.parse
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import IntEnum
-from inspect import getframeinfo, stack
 from math import ceil, floor
 
 
@@ -64,15 +63,15 @@ class Logger(LoggerApi):
     def trace(self, *messages: str) -> None:
         if self.level <= LogLevel.TRACE:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"TRACE{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -80,15 +79,15 @@ class Logger(LoggerApi):
     def debug(self, *messages: str) -> None:
         if self.level <= LogLevel.DEBUG:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"DEBUG{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -96,15 +95,15 @@ class Logger(LoggerApi):
     def fine(self, *messages: str) -> None:
         if self.level <= LogLevel.FINE:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"FINE{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -112,15 +111,15 @@ class Logger(LoggerApi):
     def detail(self, *messages: str) -> None:
         if self.level <= LogLevel.DETAIL:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"DETAIL{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -128,15 +127,15 @@ class Logger(LoggerApi):
     def info(self, *messages: str) -> None:
         if self.level <= LogLevel.INFO:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"INFO{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -144,15 +143,15 @@ class Logger(LoggerApi):
     def warning(self, *messages: str) -> None:
         if self.level <= LogLevel.WARNING:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     f"WARNING{self.whitespaces}{self.sep.join((self.serialize(object=x, width=self.width) for x in messages))}",
                 ),
             )
@@ -160,15 +159,15 @@ class Logger(LoggerApi):
     def error(self, exception: Exception) -> None:
         if self.level <= LogLevel.ERROR:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     "ERROR",
                 ),
             )
@@ -180,15 +179,15 @@ class Logger(LoggerApi):
     def critical(self, exception: Exception) -> None:
         if self.level <= LogLevel.CRITICAL:
             current_datetime_str = datetime.now(timezone.utc).strftime(self.datetime_format)
-            caller = getframeinfo(stack()[1][0])
+            caller_frame = sys._getframe(1)
             self.write(
                 current_datetime_str=current_datetime_str,
                 message=self.message_format.format(
                     self.name,
                     datetime.now(timezone.utc).strftime(self.datetime_format),
-                    os.path.basename(caller.filename),
-                    caller.function,
-                    caller.lineno,
+                    os.path.basename(caller_frame.f_code.co_filename),
+                    caller_frame.f_code.co_name,
+                    caller_frame.f_lineno,
                     "CRITICAL",
                 ),
             )
