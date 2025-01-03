@@ -1558,7 +1558,7 @@ class Exchange(ExchangeApi):
     async def update_rest_response_for_create_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)[1])
 
     async def handle_rest_response_for_cancel_order(self, *, rest_response):
         order = self.convert_rest_response_for_cancel_order(
@@ -1569,7 +1569,7 @@ class Exchange(ExchangeApi):
     async def update_rest_response_for_cancel_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)[1])
 
     async def handle_rest_response_for_fetch_order(self, *, rest_response):
         order = self.convert_rest_response_for_fetch_order(
@@ -1580,7 +1580,7 @@ class Exchange(ExchangeApi):
     async def update_rest_response_for_fetch_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)[1])
 
     async def handle_rest_response_for_fetch_open_order(self, *, rest_response):
         open_orders = self.convert_rest_response_for_fetch_open_order(
@@ -2083,7 +2083,7 @@ class Exchange(ExchangeApi):
     async def update_websocket_response_for_create_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)[1])
 
     async def handle_websocket_response_for_cancel_order(self, *, websocket_message):
         order = self.convert_websocket_response_for_cancel_order(
@@ -2094,7 +2094,7 @@ class Exchange(ExchangeApi):
     async def update_websocket_response_for_cancel_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)[1])
 
     async def handle_websocket_response_for_subscribe(self, *, websocket_message):
         self.logger.detail("websocket_message", websocket_message)
