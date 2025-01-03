@@ -104,6 +104,14 @@ class Okx(Exchange):
             OkxInstrumentType.OPTION,
         }
 
+    def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
+        if self.instrument_type == OkxInstrumentType.SPOT or self.instrument_type == OkxInstrumentType.MARGIN:
+            return f"{base_asset}-{quote_asset}"
+        elif self.instrument_type == OkxInstrumentType.SWAP:
+            return f"{base_asset}-{quote_asset}-SWAP"
+        else:
+            return None
+
     def sign_request(self, *, rest_request, time_point):
         if rest_request.headers is None:
             rest_request.headers = {}
@@ -981,10 +989,10 @@ class Okx(Exchange):
             is_long=is_long,
             entry_price=input["avgPx"],
             mark_price=input["markPx"],
-            leverage=float(input["lever"]) if input["lever"] else None,
-            initial_margin=float(input["imr"]) if input["imr"] else None,
-            maintenance_margin=float(input["mmr"]) if input["mmr"] else None,
-            unrealized_pnl=float(input["upl"]) if input["upl"] else None,
+            leverage=input["lever"],
+            initial_margin=input["imr"],
+            maintenance_margin=input["mmr"],
+            unrealized_pnl=input["upl"],
             liquidation_price=input["liqPx"],
         )
 

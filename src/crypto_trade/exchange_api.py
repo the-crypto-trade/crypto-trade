@@ -56,7 +56,7 @@ class ExchangeApi:
         self.bbos: Dict[Symbol, Bbo] = {}
         self.trades: Dict[Symbol, List[Trade]] = {}  # the list of Trade objects are sorted earliest to latest
         self.ohlcvs: Dict[Symbol, List[Ohlcv]] = {}  # the list of Ohlcv objects are sorted earliest to latest
-        self.orders: Dict[Symbol, List[Order]] = {}
+        self.orders: Dict[Symbol, List[Order]] = {}  # the list of Order objects are sorted earliest to latest
         self.fills: Dict[Symbol, List[Fill]] = {}  # the list of Fill objects are sorted earliest to latest
         self.positions: Dict[Symbol, Position] = {}
         self.balances: Dict[Symbol, Balance] = {}
@@ -481,10 +481,10 @@ class Position(BaseModel):
     is_long: Optional[bool] = None
     entry_price: Optional[str] = None
     mark_price: Optional[str] = None
-    leverage: Optional[float] = None
-    initial_margin: Optional[float] = None
-    maintenance_margin: Optional[float] = None
-    unrealized_pnl: Optional[float] = None
+    leverage: Optional[str] = None
+    initial_margin: Optional[str] = None
+    maintenance_margin: Optional[str] = None
+    unrealized_pnl: Optional[str] = None
     liquidation_price: Optional[str] = None
 
     @cached_property
@@ -520,6 +520,38 @@ class Position(BaseModel):
         return Decimal(self.mark_price) if self.mark_price else None
 
     @cached_property
+    def leverage_as_float(self):
+        return float(self.leverage) if self.leverage else None
+
+    @cached_property
+    def leverage_as_decimal(self):
+        return Decimal(self.leverage) if self.leverage else None
+
+    @cached_property
+    def initial_margin_as_float(self):
+        return float(self.initial_margin) if self.initial_margin else None
+
+    @cached_property
+    def initial_margin_as_decimal(self):
+        return Decimal(self.initial_margin) if self.initial_margin else None
+
+    @cached_property
+    def maintenance_margin_as_float(self):
+        return float(self.maintenance_margin) if self.maintenance_margin else None
+
+    @cached_property
+    def maintenance_margin_as_decimal(self):
+        return Decimal(self.maintenance_margin) if self.maintenance_margin else None
+
+    @cached_property
+    def unrealized_pnl_as_float(self):
+        return float(self.unrealized_pnl) if self.unrealized_pnl else None
+
+    @cached_property
+    def unrealized_pnl_as_decimal(self):
+        return Decimal(self.unrealized_pnl) if self.unrealized_pnl else None
+
+    @cached_property
     def liquidation_price_as_float(self):
         return float(self.liquidation_price) if self.liquidation_price else None
 
@@ -547,6 +579,7 @@ class Exchange(ExchangeApi):
         self,
         *,
         name: str,
+        exchange_id: Optional[str] = None,  # arbitrary user-defined data
         symbols: str | Iterable[str] = "*",  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
         instrument_type: Optional[str] = None,  # Defaults to spot type. See each derived exchange class for allowed values for that exchange.
         # bbo
@@ -617,8 +650,8 @@ class Exchange(ExchangeApi):
         # which API method is preferred to create/cancel orders
         trade_api_method_preference: Optional[ApiMethod] = ApiMethod.REST,
         extra_data: Any = None,  # arbitrary user-defined data
-        start_wait_seconds: int = 1,  # wait time at start
-        stop_wait_seconds: int = 1,  # wait time at stop
+        start_wait_seconds: Optional[int] = 1,  # wait time at start
+        stop_wait_seconds: Optional[int] = 1,  # wait time at stop
         client_session: Optional[aiohttp.ClientSession] = None,
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
@@ -628,6 +661,7 @@ class Exchange(ExchangeApi):
 
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
         self.name = name
+        self.exchange_id = exchange_id
 
         if isinstance(symbols, str):
             self.symbols = set((y for x in symbols.split(",") if (y := x.strip())))
@@ -792,6 +826,12 @@ class Exchange(ExchangeApi):
 
         self.stopped = False
 
+    def __str__(self):
+        return f"{self.exchange_id}"
+
+    def __repr__(self):
+        return self.__str__()
+
     async def start(self):
         self.logger.info("starting...")
 
@@ -894,7 +934,7 @@ class Exchange(ExchangeApi):
                 try:
                     while True:
                         await asyncio.sleep(self.remove_historical_trade_interval_seconds)
-                        self.remove_trades()
+                        await self.remove_trades()
                 except Exception as exception:
                     self.logger.error(exception)
 
@@ -906,7 +946,7 @@ class Exchange(ExchangeApi):
                 try:
                     while True:
                         await asyncio.sleep(self.remove_historical_ohlcv_interval_seconds)
-                        self.remove_ohlcvs()
+                        await self.remove_ohlcvs()
                 except Exception as exception:
                     self.logger.error(exception)
 
@@ -918,7 +958,7 @@ class Exchange(ExchangeApi):
                 try:
                     while True:
                         await asyncio.sleep(self.remove_historical_order_interval_seconds)
-                        self.remove_orders()
+                        await self.remove_orders()
                 except Exception as exception:
                     self.logger.error(exception)
 
@@ -930,7 +970,7 @@ class Exchange(ExchangeApi):
                 try:
                     while True:
                         await asyncio.sleep(self.remove_historical_fill_interval_seconds)
-                        self.remove_fills()
+                        await self.remove_fills()
                 except Exception as exception:
                     self.logger.error(exception)
 
@@ -986,7 +1026,8 @@ class Exchange(ExchangeApi):
 
             asyncio.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
 
-        await asyncio.sleep(self.start_wait_seconds)
+        if self.start_wait_seconds:
+            await asyncio.sleep(self.start_wait_seconds)
 
         self.logger.info("started")
 
@@ -1008,7 +1049,8 @@ class Exchange(ExchangeApi):
         if self.close_client_session_at_stop:
             await self.client_session.close()
 
-        await asyncio.sleep(self.stop_wait_seconds)
+        if self.stop_wait_seconds:
+            await asyncio.sleep(self.stop_wait_seconds)
 
         self.logger.info("stopped")
 
@@ -1023,7 +1065,7 @@ class Exchange(ExchangeApi):
             or self.websocket_account_trade_url_with_query_params not in self.websocket_logged_in_connections
         ):
             await self.send_rest_request(rest_request_function=self.rest_account_create_order_create_rest_request_function(order=order_to_create))
-            order_to_create = self.get_order(symbol=order_to_create.symbol, client_order_id=order_to_create.client_order_id)
+            order_to_create = self.get_order(symbol=order_to_create.symbol, client_order_id=order_to_create.client_order_id)[1]
         else:
             await self.send_websocket_request(
                 websocket_connection=self.websocket_connections[self.websocket_account_trade_url_with_query_params],
@@ -1087,6 +1129,9 @@ class Exchange(ExchangeApi):
 
     def is_instrument_type_valid(self, *, instrument_type):
         return True
+
+    def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
+        return None
 
     async def send_rest_request(self, *, rest_request_function, delay_seconds=0, timeout_seconds=10):
         next_rest_request_function = rest_request_function
@@ -1407,14 +1452,20 @@ class Exchange(ExchangeApi):
         all_instrument_information = self.convert_rest_response_for_all_instrument_information(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_all_instrument_information(all_instrument_information=all_instrument_information)
+
+    async def update_rest_response_for_all_instrument_information(self, *, all_instrument_information):
         self.logger.trace("all_instrument_information", all_instrument_information)
-        self.logger.trace("self.all_instrument_information", all_instrument_information)
+        self.logger.trace("self.all_instrument_information", self.all_instrument_information)
         for instrument_information in all_instrument_information:
             self.all_instrument_information[instrument_information.symbol] = instrument_information
-        self.logger.debug("self.all_instrument_information", all_instrument_information)
+        self.logger.debug("self.all_instrument_information", self.all_instrument_information)
 
     async def handle_rest_response_for_bbo(self, *, rest_response):
         bbos = self.convert_rest_response_for_bbo(json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request)
+        await self.update_rest_response_for_bbo(bbos=bbos)
+
+    async def update_rest_response_for_bbo(self, *, bbos):
         self.logger.trace("bbos", bbos)
         self.logger.trace("self.bbos", self.bbos)
         for bbo in bbos:
@@ -1425,6 +1476,15 @@ class Exchange(ExchangeApi):
         historical_trades = self.convert_rest_response_for_historical_trade(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_historical_trade(historical_trades=historical_trades)
+        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_trade_to_next_rest_request_function(
+            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
+        )
+        rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
+
+        return rest_response
+
+    async def update_rest_response_for_historical_trade(self, *, historical_trades):
         self.logger.trace("historical_trades", historical_trades)
         self.logger.trace("self.trades", self.trades)
         if historical_trades:
@@ -1453,17 +1513,19 @@ class Exchange(ExchangeApi):
                 ]
         self.logger.debug("self.trades", self.trades)
 
-        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_trade_to_next_rest_request_function(
+    async def handle_rest_response_for_historical_ohlcv(self, *, rest_response):
+        historical_ohlcvs = self.convert_rest_response_for_historical_ohlcv(
+            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
+        )
+        await self.update_rest_response_for_historical_ohlcv(historical_ohlcvs=historical_ohlcvs)
+        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_ohlcv_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
         rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
 
         return rest_response
 
-    async def handle_rest_response_for_historical_ohlcv(self, *, rest_response):
-        historical_ohlcvs = self.convert_rest_response_for_historical_ohlcv(
-            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
-        )
+    async def update_rest_response_for_historical_ohlcv(self, *, historical_ohlcvs):
         self.logger.trace("historical_ohlcvs", historical_ohlcvs)
         self.logger.trace("self.ohlcvs", self.ohlcvs)
         if historical_ohlcvs:
@@ -1488,47 +1550,44 @@ class Exchange(ExchangeApi):
                 self.ohlcvs[symbol][:0] = [x for x in historical_ohlcvs_sorted if x.start_unix_timestamp_seconds < head.start_unix_timestamp_seconds]
         self.logger.debug("self.ohlcvs", self.ohlcvs)
 
-        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_ohlcv_to_next_rest_request_function(
-            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
-        )
-        rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
-
-        return rest_response
-
     async def handle_rest_response_for_create_order(self, *, rest_response):
         order = self.convert_rest_response_for_create_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_create_order(order=order)
+
+    async def update_rest_response_for_create_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
 
     async def handle_rest_response_for_cancel_order(self, *, rest_response):
         order = self.convert_rest_response_for_cancel_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_cancel_order(order=order)
+
+    async def update_rest_response_for_cancel_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
 
     async def handle_rest_response_for_fetch_order(self, *, rest_response):
         order = self.convert_rest_response_for_fetch_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_fetch_order(order=order)
+
+    async def update_rest_response_for_fetch_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
 
     async def handle_rest_response_for_fetch_open_order(self, *, rest_response):
         open_orders = self.convert_rest_response_for_fetch_open_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        self.logger.trace("open_orders", open_orders)
-        self.logger.trace("self.orders", self.orders)
-        for open_order in open_orders:
-            self.update_order(order=open_order)
-        self.logger.debug("self.orders", self.orders)
-
+        await self.update_rest_response_for_fetch_open_order(open_orders=open_orders)
         rest_response.next_rest_request_function = self.convert_rest_response_for_fetch_open_order_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
@@ -1536,16 +1595,18 @@ class Exchange(ExchangeApi):
 
         return rest_response
 
+    async def update_rest_response_for_fetch_open_order(self, *, open_orders):
+        self.logger.trace("open_orders", open_orders)
+        self.logger.trace("self.orders", self.orders)
+        for open_order in open_orders:
+            self.update_order(order=open_order)
+        self.logger.debug("self.orders", self.orders)
+
     async def handle_rest_response_for_historical_order(self, *, rest_response):
         historical_orders = self.convert_rest_response_for_historical_order(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
-        self.logger.trace("historical_orders", historical_orders)
-        self.logger.trace("self.orders", self.orders)
-        for historical_order in historical_orders:
-            self.update_order(order=historical_order)
-        self.logger.trace("self.orders", self.orders)
-
+        await self.update_rest_response_for_historical_order(historical_orders=historical_orders)
         rest_response.next_rest_request_function = self.convert_rest_response_for_historical_order_to_next_rest_request_function(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
@@ -1553,10 +1614,26 @@ class Exchange(ExchangeApi):
 
         return rest_response
 
+    async def update_rest_response_for_historical_order(self, *, historical_orders):
+        self.logger.trace("historical_orders", historical_orders)
+        self.logger.trace("self.orders", self.orders)
+        for historical_order in historical_orders:
+            self.update_order(order=historical_order)
+        self.logger.trace("self.orders", self.orders)
+
     async def handle_rest_response_for_historical_fill(self, *, rest_response):
         historical_fills = self.convert_rest_response_for_historical_fill(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_historical_fill(historical_fills=historical_fills)
+        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_fill_to_next_rest_request_function(
+            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
+        )
+        rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
+
+        return rest_response
+
+    async def update_rest_response_for_historical_fill(self, *, historical_fills):
         self.logger.trace("historical_fills", historical_fills)
         self.logger.trace("self.fills", self.fills)
         if historical_fills:
@@ -1585,17 +1662,13 @@ class Exchange(ExchangeApi):
                 ]
         self.logger.debug("self.fills", self.fills)
 
-        rest_response.next_rest_request_function = self.convert_rest_response_for_historical_fill_to_next_rest_request_function(
-            json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
-        )
-        rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
-
-        return rest_response
-
     async def handle_rest_response_for_fetch_position(self, *, rest_response):
         positions = self.convert_rest_response_for_fetch_position(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_fetch_position(positions=positions)
+
+    async def update_rest_response_for_fetch_position(self, *, positions):
         self.logger.trace("positions", positions)
         self.logger.trace("self.positions", self.positions)
         positions_not_zero = [x for x in positions if not x.quantity_as_decimal.is_zero()]
@@ -1611,6 +1684,9 @@ class Exchange(ExchangeApi):
         balances = self.convert_rest_response_for_fetch_balance(
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
+        await self.update_rest_response_for_fetch_balance(balances=balances)
+
+    async def update_rest_response_for_fetch_balance(self, *, balances):
         self.logger.trace("balances", balances)
         self.logger.trace("self.balances", self.balances)
         balances_not_zero = [x for x in balances if not x.quantity_as_decimal.is_zero()]
@@ -1900,6 +1976,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_bbo(self, *, websocket_message):
         bbos = self.convert_websocket_push_data_for_bbo(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_bbo(bbos=bbos)
+
+    async def update_websocket_push_data_for_bbo(self, *, bbos):
         self.logger.trace("bbos", bbos)
         self.logger.trace("self.bbos", self.bbos)
         for bbo in bbos:
@@ -1908,6 +1987,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_trade(self, *, websocket_message):
         trades = self.convert_websocket_push_data_for_trade(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_trade(trades=trades)
+
+    async def update_websocket_push_data_for_trade(self, *, trades):
         self.logger.trace("trades", trades)
         self.logger.trace("self.trades", self.trades)
         if trades:
@@ -1924,6 +2006,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_ohlcv(self, *, websocket_message):
         ohlcvs = self.convert_websocket_push_data_for_ohlcv(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_ohlcv(ohlcvs=ohlcvs)
+
+    async def update_websocket_push_data_for_ohlcv(self, *, ohlcvs):
         self.logger.trace("ohlcvs", ohlcvs)
         self.logger.trace("self.ohlcvs", self.ohlcvs)
         if ohlcvs:
@@ -1940,6 +2025,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_order(self, *, websocket_message):
         orders = self.convert_websocket_push_data_for_order(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        self.update_websocket_push_data_for_order(orders=orders)
+
+    async def update_websocket_push_data_for_order(self, *, orders):
         self.logger.trace("orders", orders)
         self.logger.trace("self.orders", self.orders)
         for order in orders:
@@ -1948,6 +2036,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_fill(self, *, websocket_message):
         fills = self.convert_websocket_push_data_for_fill(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_fill(fills=fills)
+
+    async def update_websocket_push_data_for_fill(self, *, fills):
         self.logger.trace("fills", fills)
         self.logger.trace("self.fills", self.fills)
         if fills:
@@ -1964,6 +2055,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_position(self, *, websocket_message):
         positions = self.convert_websocket_push_data_for_position(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_position(positions=positions)
+
+    async def update_websocket_push_data_for_position(self, *, positions):
         self.logger.trace("positions", positions)
         self.logger.trace("self.positions", self.positions)
         for position in positions:
@@ -1972,6 +2066,9 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_balance(self, *, websocket_message):
         balances = self.convert_websocket_push_data_for_balance(json_deserialized_payload=websocket_message.json_deserialized_payload)
+        await self.update_websocket_push_data_for_balance(balances=balances)
+
+    async def update_websocket_push_data_for_balance(self, *, balances):
         self.logger.trace("balances", balances)
         self.logger.trace("self.balances", self.balances)
         for balance in balances:
@@ -1982,17 +2079,23 @@ class Exchange(ExchangeApi):
         order = self.convert_websocket_response_for_create_order(
             json_deserialized_payload=websocket_message.json_deserialized_payload, websocket_request=websocket_message.websocket_request
         )
+        await self.update_websocket_response_for_create_order(order=order)
+
+    async def update_websocket_response_for_create_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
 
     async def handle_websocket_response_for_cancel_order(self, *, websocket_message):
         order = self.convert_websocket_response_for_cancel_order(
             json_deserialized_payload=websocket_message.json_deserialized_payload, websocket_request=websocket_message.websocket_request
         )
+        self.update_websocket_response_for_cancel_order(order=order)
+
+    async def update_websocket_response_for_cancel_order(self, *, order):
         self.logger.trace("order", order)
         self.update_order(order=order)
-        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))
+        self.logger.debug("order updated", self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id))[1]
 
     async def handle_websocket_response_for_subscribe(self, *, websocket_message):
         self.logger.detail("websocket_message", websocket_message)
@@ -2184,7 +2287,7 @@ class Exchange(ExchangeApi):
             else:
                 self.balances[balance.symbol] = balance
 
-    def remove_trades(self):
+    async def remove_trades(self):
         self.logger.trace("self.trades", self.trades)
 
         if self.keep_historical_trade_seconds:
@@ -2198,7 +2301,7 @@ class Exchange(ExchangeApi):
 
         self.logger.debug("self.trades", self.trades)
 
-    def remove_ohlcvs(self):
+    async def remove_ohlcvs(self):
         self.logger.trace("self.ohlcvs", self.ohlcvs)
 
         if self.keep_historical_ohlcv_seconds:
@@ -2211,7 +2314,7 @@ class Exchange(ExchangeApi):
 
         self.logger.debug("self.ohlcvs", self.ohlcvs)
 
-    def remove_orders(self):
+    async def remove_orders(self):
         self.logger.trace("self.orders", self.orders)
 
         if self.keep_historical_order_seconds:
@@ -2236,7 +2339,7 @@ class Exchange(ExchangeApi):
 
         self.logger.debug("self.orders", self.orders)
 
-    def remove_fills(self):
+    async def remove_fills(self):
         self.logger.trace("self.fills", self.fills)
 
         if self.keep_historical_fill_seconds:
