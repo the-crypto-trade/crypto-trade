@@ -1040,11 +1040,10 @@ class Exchange(ExchangeApi):
             if not websocket_connection.connection.closed:
                 await websocket_connection.connection.close()
 
-        for task in asyncio.all_tasks():
-            if task is not asyncio.current_task():
-                task.cancel()
-
-        await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
+        all_other_tasks_except_the_current_one = {task for task in asyncio.all_tasks() if task is not asyncio.current_task()}
+        for task in all_other_tasks_except_the_current_one:
+            task.cancel()
+        await asyncio.gather(*all_other_tasks_except_the_current_one, return_exceptions=True)
 
         if self.close_client_session_at_stop:
             await self.client_session.close()
@@ -2025,7 +2024,7 @@ class Exchange(ExchangeApi):
 
     async def handle_websocket_push_data_for_order(self, *, websocket_message):
         orders = self.convert_websocket_push_data_for_order(json_deserialized_payload=websocket_message.json_deserialized_payload)
-        self.update_websocket_push_data_for_order(orders=orders)
+        await self.update_websocket_push_data_for_order(orders=orders)
 
     async def update_websocket_push_data_for_order(self, *, orders):
         self.logger.trace("orders", orders)
@@ -2090,7 +2089,7 @@ class Exchange(ExchangeApi):
         order = self.convert_websocket_response_for_cancel_order(
             json_deserialized_payload=websocket_message.json_deserialized_payload, websocket_request=websocket_message.websocket_request
         )
-        self.update_websocket_response_for_cancel_order(order=order)
+        await self.update_websocket_response_for_cancel_order(order=order)
 
     async def update_websocket_response_for_cancel_order(self, *, order):
         self.logger.trace("order", order)
