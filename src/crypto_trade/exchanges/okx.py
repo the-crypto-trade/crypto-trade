@@ -372,7 +372,7 @@ class Okx(Exchange):
             symbol=rest_request.json_payload["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             order_id=x["ordId"],
-            client_order_id=rest_request.json_payload.get("clOrdId"),
+            client_order_id=x["clOrdId"],
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
             status=OrderStatus.CREATE_ACKNOWLEDGED,
         )
@@ -384,8 +384,8 @@ class Okx(Exchange):
             api_method=ApiMethod.REST,
             symbol=rest_request.json_payload["instId"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
-            order_id=rest_request.json_payload.get("ordId"),
-            client_order_id=rest_request.json_payload.get("clOrdId"),
+            order_id=x["ordId"],
+            client_order_id=x["clOrdId"],
             status=OrderStatus.CANCEL_ACKNOWLEDGED,
         )
 

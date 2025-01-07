@@ -8,6 +8,7 @@ except ImportError:
 import asyncio
 import dataclasses
 import functools
+import ssl
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
@@ -652,7 +653,9 @@ class Exchange(ExchangeApi):
         extra_data: Any = None,  # arbitrary user-defined data
         start_wait_seconds: Optional[int] = 1,  # wait time at start
         stop_wait_seconds: Optional[int] = 1,  # wait time at stop
-        client_session: Optional[aiohttp.ClientSession] = None,
+        ssl: bool | aiohttp.Fingerprint | ssl.SSLContext = False,  # SSL validation mode. True for default SSL check
+        # (ssl.create_default_context() is used), False for skip SSL certificate validation,
+        # aiohttp.Fingerprint for fingerprint validation, ssl.SSLContext for custom SSL certificate validation.
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
         logger: Optional[LoggerApi] = None,
@@ -755,8 +758,7 @@ class Exchange(ExchangeApi):
         self.start_wait_seconds = start_wait_seconds
         self.stop_wait_seconds = stop_wait_seconds
 
-        self.client_session = client_session if client_session else aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
-        self.close_client_session_at_stop = not client_session
+        self.client_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl))
 
         if json_serialize:
             self.json_serialize = json_serialize
@@ -824,7 +826,9 @@ class Exchange(ExchangeApi):
         self.websocket_logged_in_connections: Set[str] = set()
         self.websocket_requests: Dict[str, WebsocketRequest] = {}
 
-        self.stopped = False
+        self.stopped: bool = False
+
+        self.all_tasks: Set[asyncio.Task] = set()
 
     def __str__(self):
         return f"{self.exchange_id}"
@@ -852,7 +856,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_market_data_fetch_all_instrument_information())
+            self.create_task(coro=start_periodic_rest_market_data_fetch_all_instrument_information())
 
         if self.subscribe_bbo or self.rest_market_data_fetch_bbo_period_seconds:
             await self.rest_market_data_fetch_bbo()
@@ -867,7 +871,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
+            self.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
 
         if self.subscribe_order or self.rest_account_fetch_open_order_at_start or self.rest_account_cancel_open_order_at_start:
             await self.rest_account_fetch_open_order()
@@ -884,7 +888,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_account_check_open_order())
+            self.create_task(coro=start_periodic_rest_account_check_open_order())
 
         if self.rest_account_check_in_flight_order_period_seconds:
 
@@ -896,7 +900,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_account_check_in_flight_order())
+            self.create_task(coro=start_periodic_rest_account_check_in_flight_order())
 
         if self.subscribe_position or self.rest_account_fetch_position_period_seconds:
             await self.rest_account_fetch_position()
@@ -911,7 +915,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_account_fetch_position())
+            self.create_task(coro=start_periodic_rest_account_fetch_position())
 
         if self.subscribe_balance or self.rest_account_fetch_balance_period_seconds:
             await self.rest_account_fetch_balance()
@@ -926,7 +930,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_rest_account_fetch_balance())
+            self.create_task(coro=start_periodic_rest_account_fetch_balance())
 
         if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start) and self.trades:
 
@@ -938,7 +942,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_remove_historical_trade())
+            self.create_task(coro=start_periodic_remove_historical_trade())
 
         if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start) and self.ohlcvs:
 
@@ -950,7 +954,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_remove_historical_ohlcv())
+            self.create_task(coro=start_periodic_remove_historical_ohlcv())
 
         if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start) and self.orders:
 
@@ -962,7 +966,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_remove_historical_order())
+            self.create_task(coro=start_periodic_remove_historical_order())
 
         if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start) and self.fills:
 
@@ -974,7 +978,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_periodic_remove_historical_fill())
+            self.create_task(coro=start_periodic_remove_historical_fill())
 
         await asyncio.gather(self.websocket_market_data_connect(), self.websocket_account_connect())
         await asyncio.gather(self.rest_market_data_fetch_historical_data(), self.rest_account_fetch_historical_data())
@@ -997,7 +1001,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_websocket_connection_ping_on_application_level())
+            self.create_task(coro=start_websocket_connection_ping_on_application_level())
 
         if self.websocket_connection_application_level_heartbeat_timeout_seconds:
 
@@ -1024,7 +1028,7 @@ class Exchange(ExchangeApi):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
+            self.create_task(coro=start_websocket_connection_application_level_heartbeat_timeout())
 
         if self.start_wait_seconds:
             await asyncio.sleep(self.start_wait_seconds)
@@ -1040,13 +1044,12 @@ class Exchange(ExchangeApi):
             if not websocket_connection.connection.closed:
                 await websocket_connection.connection.close()
 
-        all_other_tasks_except_the_current_one = {task for task in asyncio.all_tasks() if task is not asyncio.current_task()}
-        for task in all_other_tasks_except_the_current_one:
+        for task in self.all_tasks:
             task.cancel()
-        await asyncio.gather(*all_other_tasks_except_the_current_one, return_exceptions=True)
 
-        if self.close_client_session_at_stop:
-            await self.client_session.close()
+        await asyncio.gather(*self.all_tasks, return_exceptions=True)
+
+        await self.client_session.close()
 
         if self.stop_wait_seconds:
             await asyncio.sleep(self.stop_wait_seconds)
@@ -1829,7 +1832,7 @@ class Exchange(ExchangeApi):
 
     async def websocket_market_data_connect(self):
         if self.symbols and (self.subscribe_bbo or self.subscribe_trade or self.subscribe_ohlcv):
-            asyncio.create_task(
+            self.create_task(
                 coro=self.start_websocket_connect(
                     base_url=self.websocket_market_data_base_url, path=self.websocket_market_data_path, query_params=self.websocket_market_data_query_params
                 )
@@ -1847,7 +1850,7 @@ class Exchange(ExchangeApi):
 
     async def websocket_account_connect(self):
         if self.subscribe_order or self.subscribe_fill or self.subscribe_position or self.subscribe_balance:
-            asyncio.create_task(
+            self.create_task(
                 coro=self.start_websocket_connect(
                     base_url=self.websocket_account_base_url, path=self.websocket_account_path, query_params=self.websocket_account_query_params
                 )
@@ -2121,7 +2124,7 @@ class Exchange(ExchangeApi):
             except Exception as exception:
                 self.logger.error(exception)
 
-        asyncio.create_task(coro=start_reset_websocket_reconnect_delay())
+        self.create_task(coro=start_reset_websocket_reconnect_delay())
 
     def generate_next_websocket_reconnect_delay_seconds(self, *, url_with_query_params):
         if url_with_query_params not in self.websocket_reconnect_delay_seconds:
@@ -2371,3 +2374,8 @@ class Exchange(ExchangeApi):
 
         client_order_id_sequence_number_suffix = str(self.last_client_order_id_sequence_number).zfill(self.client_order_id_sequence_number_padding_length)
         return f"{self.last_client_order_id_unix_timestamp_seconds}{client_order_id_sequence_number_suffix}"
+
+    def create_task(self, *, coro):
+        task = asyncio.create_task(coro=coro)
+        self.all_tasks.add(task)
+        task.add_done_callback(self.all_tasks.discard)

@@ -38,9 +38,9 @@ async def main():
             # subscribe_position=True,
             # subscribe_balance=True,
             is_demo_trading=True,  # https://www.exchange.com/docs-v5/en/#overview-demo-trading-services
-            api_key=os.environ.get("OKX_API_KEY", ""),
-            api_secret=os.environ.get("OKX_API_SECRET", ""),
-            api_passphrase=os.environ.get("OKX_API_PASSPHRASE", ""),
+            api_key=os.getenv("OKX_API_KEY", ""),
+            api_secret=os.getenv("OKX_API_SECRET", ""),
+            api_passphrase=os.getenv("OKX_API_PASSPHRASE", ""),
             # trade_api_method_preference = ApiMethod.WEBSOCKET,
         )
 

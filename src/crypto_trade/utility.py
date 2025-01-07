@@ -173,7 +173,7 @@ class Logger(LoggerApi):
             )
             self.write(current_datetime_str=current_datetime_str, message=repr(exception))
             self.write(current_datetime_str=current_datetime_str, message=traceback.format_exc())
-            if os.environ.get("CRYPTO_TRADE_TEST_FLAG"):
+            if os.getenv("CRYPTO_TRADE_EXIT_ON_ERROR", "false").lower() == "true":
                 sys.exit("exit")
 
     def critical(self, exception: Exception) -> None:

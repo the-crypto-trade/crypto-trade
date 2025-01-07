@@ -38,7 +38,7 @@ jobs:
       - name: Run examples
         if: runner.os != 'Windows'
         env:
-          CRYPTO_TRADE_TEST_FLAG: "1"
+          CRYPTO_TRADE_EXIT_ON_ERROR: "true"
         run: |
           for file in $(find examples -name '*.py');
           do
@@ -55,6 +55,6 @@ jobs:
 
       - name: Run tests
         env:
-          CRYPTO_TRADE_TEST_FLAG: "1"
+          CRYPTO_TRADE_EXIT_ON_ERROR: "true"
         run: |
           pytest tests/
