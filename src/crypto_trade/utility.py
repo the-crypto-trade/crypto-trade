@@ -9,6 +9,11 @@ from decimal import Decimal
 from enum import IntEnum
 from math import ceil, floor
 
+datetime_format_1 = "%Y-%m-%dT%H:%M:%S.%fZ"
+datetime_format_2 = "%Y-%m-%dT%H-%M-%S.%fZ"
+datetime_format_3 = "%Y-%m-%dT%H:%M:%S"
+datetime_format_4 = "%Y-%m-%dT%H-%M-%S"
+
 
 class LogLevel(IntEnum):
     TRACE = 10
@@ -50,7 +55,7 @@ class LoggerApi:
 
 
 class Logger(LoggerApi):
-    def __init__(self, *, level, name, datetime_format="%Y-%m-%dT%H:%M:%S.%fZ", sep="\n", end="\n\n", width=160):
+    def __init__(self, *, level, name, datetime_format=datetime_format_1, sep="\n", end="\n\n", width=160):
         self.level = level
         self.name = name
         self.message_format = "{} {} {{{}:{}:{}}} {}"
@@ -206,6 +211,72 @@ class Logger(LoggerApi):
     def write(self, *, current_datetime_str, message):
         sys.stdout.write(message)
         sys.stdout.write(self.end)
+
+
+class LoggerWithWriter(Logger):
+    def __init__(self, *, level, name, writer):
+        super().__init__(level=level, name=name)
+        self.writer = writer
+
+    def write(self, *, current_datetime_str, message):
+        self.writer.write(current_datetime_str=current_datetime_str, message=message)
+
+    def close(self):
+        self.writer.close()
+
+
+class Writer:
+    def __init__(
+        self, *, end, write_path=None, write_dir=None, write_current_datetime_str_key=None, write_extension=None, write_header=None, write_buffering=-1
+    ):
+        self.end = end
+        self.write_file = None
+        self.write_path = write_path
+        self.write_dir = write_dir
+        if write_current_datetime_str_key:
+            self.write_current_datetime_str_key = write_current_datetime_str_key
+        else:
+            self.write_current_datetime_str_key = lambda current_datetime_str: current_datetime_str[:10]
+        self.write_extension = write_extension or ".txt"
+        self.write_header = write_header
+        if self.write_path:
+            os.makedirs(os.path.dirname(self.write_path), exist_ok=True)
+        elif self.write_dir:
+            os.makedirs(self.write_dir, exist_ok=True)
+        self.write_buffering = write_buffering
+
+    def write(self, *, current_datetime_str, message):
+        if self.write_path:
+            if not self.write_file:
+                self.open(current_datetime_str_key="", write_path=self.write_path)
+            self.write_file[1].write(message)
+            self.write_file[1].write(self.end)
+        elif self.write_dir:
+            current_datetime_str_key = self.write_current_datetime_str_key(current_datetime_str)
+            write_path = f"{self.write_dir}/{current_datetime_str_key}{self.write_extension}"
+            if not self.write_file:
+                self.open(current_datetime_str_key=current_datetime_str_key, write_path=write_path)
+            else:
+                if self.write_file[0] != current_datetime_str_key:
+                    if not self.write_file[1].closed:
+                        self.write_file[1].close()
+                    self.open(current_datetime_str_key=current_datetime_str_key, write_path=write_path)
+            self.write_file[1].write(message)
+            self.write_file[1].write(self.end)
+        else:
+            sys.stdout.write(message)
+            sys.stdout.write(self.end)
+
+    def open(self, *, current_datetime_str_key, write_path):
+        need_write_header = self.write_header and (not os.path.exists(write_path) or os.path.getsize(write_path) == 0)
+        self.write_file = (current_datetime_str_key, open(write_path, "a", buffering=self.write_buffering))
+        if need_write_header:
+            self.write_file[1].write(self.write_header)
+            self.write_file[1].write(self.end)
+
+    def close(self):
+        if self.write_file and self.write_file[1] and not self.write_file[1].closed:
+            self.write_file[1].close()
 
 
 class RestRequest:

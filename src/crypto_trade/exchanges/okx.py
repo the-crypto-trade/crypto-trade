@@ -29,6 +29,7 @@ from crypto_trade.utility import (
     WebsocketRequest,
     convert_set_to_subsets,
     convert_unix_timestamp_milliseconds_to_time_point,
+    datetime_format_3,
     normalize_decimal_string,
     remove_leading_negative_sign_in_string,
     time_point_now,
@@ -120,7 +121,7 @@ class Okx(Exchange):
         headers["CONTENT-TYPE"] = "application/json"
         headers["OK-ACCESS-KEY"] = self.api_key
         headers["OK-ACCESS-TIMESTAMP"] = (
-            f"{datetime.fromtimestamp(time_point[0], tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}.{str(time_point[1] // 1_000_000).zfill(3)}Z"
+            f"{datetime.fromtimestamp(time_point[0], tz=timezone.utc).strftime(datetime_format_3)}.{str(time_point[1] // 1_000_000).zfill(3)}Z"
         )
         headers["OK-ACCESS-PASSPHRASE"] = self.api_passphrase
         headers["OK-ACCESS-SIGN"] = base64.b64encode(

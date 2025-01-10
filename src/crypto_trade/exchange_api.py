@@ -1765,7 +1765,6 @@ class Exchange(ExchangeApi):
 
         if not websocket_connection.connection.closed and websocket_request and websocket_request.payload:
             self.websocket_requests[websocket_request.id] = websocket_request
-            self.logger.debug("about to websocket_connection.connection.send_str")
             await websocket_connection.connection.send_str(websocket_request.payload)
 
     async def websocket_on_message(self, *, websocket_connection, raw_websocket_message_data):
@@ -1815,6 +1814,9 @@ class Exchange(ExchangeApi):
 
             elif self.is_websocket_response_for_login(websocket_message=websocket_message):
                 await self.handle_websocket_response_for_login(websocket_message=websocket_message)
+
+            elif self.is_websocket_response_for_ping_on_application_level(websocket_message=websocket_message):
+                await self.handle_websocket_response_for_ping_on_application_level(websocket_message=websocket_message)
 
         else:
             await self.handle_websocket_response_for_error(websocket_message=websocket_message)
@@ -1947,6 +1949,9 @@ class Exchange(ExchangeApi):
         pass
 
     def is_websocket_response_for_login(self, *, websocket_message):
+        pass
+
+    def is_websocket_response_for_ping_on_application_level(self, *, websocket_message):
         pass
 
     def convert_websocket_push_data_for_bbo(self, *, json_deserialized_payload):
@@ -2112,6 +2117,9 @@ class Exchange(ExchangeApi):
         self.reset_websocket_reconnect_delay(url_with_query_params=websocket_connection.url_with_query_params)
         if websocket_connection.path == self.websocket_account_path:
             await self.websocket_account_subscribe(websocket_connection=websocket_connection)
+
+    async def handle_websocket_response_for_ping_on_application_level(self, *, websocket_message):
+        self.logger.trace("received application level pong")
 
     def handle_websocket_response_for_error(self, *, websocket_message):
         raise NotImplementedError
