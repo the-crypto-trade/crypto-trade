@@ -13,6 +13,8 @@ datetime_format_1 = "%Y-%m-%dT%H:%M:%S.%fZ"
 datetime_format_2 = "%Y-%m-%dT%H-%M-%S.%fZ"
 datetime_format_3 = "%Y-%m-%dT%H:%M:%S"
 datetime_format_4 = "%Y-%m-%dT%H-%M-%S"
+datetime_format_5 = "%Y-%m-%dT%H:%M:%SZ"
+datetime_format_6 = "%Y-%m-%dT%H-%M-%SZ"
 
 
 class LogLevel(IntEnum):
@@ -55,7 +57,7 @@ class LoggerApi:
 
 
 class Logger(LoggerApi):
-    def __init__(self, *, level, name, datetime_format=datetime_format_1, sep="\n", end="\n\n", width=160):
+    def __init__(self, *, level, name, datetime_format=datetime_format_1, sep="\n", end="\n\n", width=160, exit_on_error=False):
         self.level = level
         self.name = name
         self.message_format = "{} {} {{{}:{}:{}}} {}"
@@ -64,6 +66,7 @@ class Logger(LoggerApi):
         self.end = end
         self.width = width
         self.whitespaces = 10 * " "
+        self.exit_on_error = exit_on_error
 
     def trace(self, *messages: str) -> None:
         if self.level <= LogLevel.TRACE:
@@ -178,7 +181,7 @@ class Logger(LoggerApi):
             )
             self.write(current_datetime_str=current_datetime_str, message=repr(exception))
             self.write(current_datetime_str=current_datetime_str, message=traceback.format_exc())
-            if os.getenv("CRYPTO_TRADE_EXIT_ON_ERROR", "false").lower() == "true":
+            if os.getenv("CRYPTO_TRADE_EXIT_ON_ERROR", "false").lower() == "true" or self.exit_on_error:
                 sys.exit("exit")
 
     def critical(self, exception: Exception) -> None:
@@ -227,7 +230,7 @@ class LoggerWithWriter(Logger):
 
 class Writer:
     def __init__(
-        self, *, end, write_path=None, write_dir=None, write_current_datetime_str_key=None, write_extension=None, write_header=None, write_buffering=-1
+        self, *, end="\n\n", write_path=None, write_dir=None, write_current_datetime_str_key=None, write_extension=None, write_header=None, write_buffering=-1
     ):
         self.end = end
         self.write_file = None
@@ -546,3 +549,7 @@ def convert_decimal_to_string(*, input, normalize=False):
     if normalize:
         output = normalize_decimal_string(input=output)
     return output
+
+
+def convert_datetime_string_from_colon_to_hyphen(*, input):
+    return input.replace(":", "-")

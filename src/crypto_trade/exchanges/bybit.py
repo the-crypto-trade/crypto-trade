@@ -1,17 +1,10 @@
-
 try:
     from enum import StrEnum
 except ImportError:
     from strenum import StrEnum  # type: ignore
 
-from crypto_trade.exchange_api import (
-    ApiMethod,
-    Exchange,
-    Trade,
-)
-from crypto_trade.utility import (
-    convert_unix_timestamp_milliseconds_to_time_point,
-)
+from crypto_trade.exchange_api import ApiMethod, Exchange, Trade
+from crypto_trade.utility import convert_unix_timestamp_milliseconds_to_time_point
 
 
 class BybitInstrumentType(StrEnum):
@@ -503,7 +496,7 @@ class Bybit(Exchange):
     #             except Exception as exception:
     #                 self.logger.error(exception)
 
-    #         asyncio.create_task(coro=start_rest_account_fetch_order())
+    #         self.create_task(coro=start_rest_account_fetch_order())
 
     #     elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
     #         if (
@@ -525,7 +518,7 @@ class Bybit(Exchange):
     #     if self.symbols:
 
     #         if self.subscribe_bbo or self.subscribe_trade:
-    #             asyncio.create_task(
+    #             self.create_task(
     #                 coro=self.start_websocket_connect(
     #                     base_url=self.websocket_market_data_base_url,
     #                     path=self.websocket_market_data_path,
@@ -534,7 +527,7 @@ class Bybit(Exchange):
     #             )
 
     #         if self.subscribe_ohlcv:
-    #             asyncio.create_task(
+    #             self.create_task(
     #                 coro=self.start_websocket_connect(
     #                     base_url=self.websocket_market_data_base_url,
     #                     path=self.websocket_market_data_path_2,
@@ -832,7 +825,7 @@ class Bybit(Exchange):
     #             except Exception as exception:
     #                 self.logger.error(exception)
 
-    #         asyncio.create_task(coro=start_rest_account_fetch_order())
+    #         self.create_task(coro=start_rest_account_fetch_order())
 
     # def account_create_order_create_json_payload(self, *, order):
     #     if order.is_market:

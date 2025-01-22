@@ -519,7 +519,7 @@ class Okx(Exchange):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_rest_account_fetch_order())
+            self.create_task(coro=start_rest_account_fetch_order())
 
         elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
             if (
@@ -541,7 +541,7 @@ class Okx(Exchange):
         if self.symbols:
 
             if self.subscribe_bbo or self.subscribe_trade:
-                asyncio.create_task(
+                self.create_task(
                     coro=self.start_websocket_connect(
                         base_url=self.websocket_market_data_base_url,
                         path=self.websocket_market_data_path,
@@ -550,7 +550,7 @@ class Okx(Exchange):
                 )
 
             if self.subscribe_ohlcv:
-                asyncio.create_task(
+                self.create_task(
                     coro=self.start_websocket_connect(
                         base_url=self.websocket_market_data_base_url,
                         path=self.websocket_market_data_path_2,
@@ -839,7 +839,7 @@ class Okx(Exchange):
                 except Exception as exception:
                     self.logger.error(exception)
 
-            asyncio.create_task(coro=start_rest_account_fetch_order())
+            self.create_task(coro=start_rest_account_fetch_order())
 
     def account_create_order_create_json_payload(self, *, order):
         if order.is_market:
@@ -855,7 +855,7 @@ class Okx(Exchange):
 
         json_payload = {
             "instId": order.symbol,
-            "tdMode": str(order.margin_type) if order.margin_type else "cash",
+            "tdMode": order.margin_type.value().lower() if order.margin_type else "cash",
             "clOrdId": order.client_order_id,
             "side": "buy" if order.is_buy else "sell",
             "ordType": ord_type,

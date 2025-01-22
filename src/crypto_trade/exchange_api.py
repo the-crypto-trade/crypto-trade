@@ -431,6 +431,10 @@ class Order(BaseModel):
     def is_eligible_to_cancel(self):
         return not self.is_in_flight and self.status != OrderStatus.CANCEL_ACKNOWLEDGED and self.is_open
 
+    @property
+    def is_partially_or_fully_filled(self):
+        return self.status == OrderStatus.PARTIALLY_FILLED or self.status == OrderStatus.FILLED
+
 
 @dataclass(frozen=True, kw_only=True)
 class Fill(BaseModel):
