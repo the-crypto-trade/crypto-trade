@@ -351,6 +351,8 @@ class Order(BaseModel):
     local_update_time_point: Optional[Tuple[int, int]] = None
     status: Optional[OrderStatus] = None
 
+    extra_data: Any = None
+
     @cached_property
     def order_id_as_int(self):
         return int(self.order_id) if self.order_id else None
@@ -2225,6 +2227,8 @@ class Exchange(ExchangeApi):
                 margin_type = order_to_update.margin_type
                 margin_asset = order_to_update.margin_asset
 
+                extra_params = order_to_update.extra_params
+
                 cumulative_filled_quantity = order_to_update.cumulative_filled_quantity
                 cumulative_filled_quote_quantity = order_to_update.cumulative_filled_quote_quantity
                 if has_fill:
@@ -2237,6 +2241,8 @@ class Exchange(ExchangeApi):
 
                 local_update_time_point = time_point_now()
                 status = order.status
+
+                extra_data = order_to_update.extra_data
 
                 self.orders[symbol][index] = Order(
                     api_method=api_method,
@@ -2254,11 +2260,13 @@ class Exchange(ExchangeApi):
                     is_reduce_only=is_reduce_only,
                     margin_type=margin_type,
                     margin_asset=margin_asset,
+                    extra_params=extra_params,
                     cumulative_filled_quantity=cumulative_filled_quantity,
                     cumulative_filled_quote_quantity=cumulative_filled_quote_quantity,
                     exchange_create_time_point=exchange_create_time_point,
                     local_update_time_point=local_update_time_point,
                     status=status,
+                    extra_data=extra_data,
                 )
         else:
             self.append_order(order=dataclasses.replace(order, local_update_time_point=time_point_now()))
