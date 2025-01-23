@@ -855,7 +855,7 @@ class Okx(Exchange):
 
         json_payload = {
             "instId": order.symbol,
-            "tdMode": order.margin_type.value().lower() if order.margin_type else "cash",
+            "tdMode": order.margin_type.value.lower() if order.margin_type else "cash",
             "clOrdId": order.client_order_id,
             "side": "buy" if order.is_buy else "sell",
             "ordType": ord_type,
