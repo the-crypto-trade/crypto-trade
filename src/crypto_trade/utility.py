@@ -485,25 +485,31 @@ def convert_unix_timestamp_milliseconds_to_time_point(*, unix_timestamp_millisec
     return (x[0], x[1] * 1_000_000)
 
 
-def round_to_nearest(*, input, increment, increment_as_float=None, increment_as_decimal=None):
+def round_to_nearest(*, input, increment=None, increment_as_float=None, increment_as_decimal=None):
     if increment_as_decimal is None:
         increment_as_decimal = Decimal(increment)
+    if increment is None:
+        increment_as_float = float(increment_as_decimal)
     return increment_as_decimal * round(round_calculate_divide(input=input, increment=increment, increment_as_float=increment_as_float))
 
 
-def round_up(*, input, increment, increment_as_float=None, increment_as_decimal=None):
+def round_up(*, input, increment=None, increment_as_float=None, increment_as_decimal=None):
     if increment_as_decimal is None:
         increment_as_decimal = Decimal(increment)
+    if increment is None:
+        increment_as_float = float(increment_as_decimal)
     return increment_as_decimal * ceil(round_calculate_divide(input=input, increment=increment, increment_as_float=increment_as_float))
 
 
-def round_down(*, input, increment, increment_as_float=None, increment_as_decimal=None):
+def round_down(*, input, increment=None, increment_as_float=None, increment_as_decimal=None):
     if increment_as_decimal is None:
         increment_as_decimal = Decimal(increment)
+    if increment is None:
+        increment_as_float = float(increment_as_decimal)
     return increment_as_decimal * floor(round_calculate_divide(input=input, increment=increment, increment_as_float=increment_as_float))
 
 
-def round_calculate_divide(*, input, increment, increment_as_float=None):
+def round_calculate_divide(*, input, increment=None, increment_as_float=None):
     input_as_float = float(input)
     if increment_as_float is None:
         increment_as_float = float(increment)

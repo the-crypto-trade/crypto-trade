@@ -72,11 +72,23 @@ class ExchangeApi:
         raise NotImplementedError
 
     async def cancel_order(
-        self, *, symbol: str, order_id: Optional[str] = None, client_order_id: Optional[str] = None, trade_api_method_preference: Optional[ApiMethod] = None
+        self,
+        *,
+        symbol: str,
+        order_id: Optional[str] = None,
+        client_order_id: Optional[str] = None,
+        trade_api_method_preference: Optional[ApiMethod] = None,
+        local_update_time_point: Optional[Tuple[int, int]] = None,
     ) -> None:
         raise NotImplementedError
 
-    async def cancel_orders(self, *, symbol: Optional[str] = None, trade_api_method_preference: Optional[ApiMethod] = None) -> None:
+    async def cancel_orders(
+        self,
+        *,
+        symbol: Optional[str] = None,
+        trade_api_method_preference: Optional[ApiMethod] = None,
+        local_update_time_point: Optional[Tuple[int, int]] = None,
+    ) -> None:
         # if symbol is not provided, it will try to cancel all open orders
         raise NotImplementedError
 
@@ -1083,16 +1095,18 @@ class Exchange(ExchangeApi):
         return order_to_create
 
     def create_order_ensure_client_order_id(self, *, order):
+        now_time_point = order.local_update_time_point if order.local_update_time_point else time_point_now()
         if not order.client_order_id:
             return dataclasses.replace(
-                order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT, client_order_id=self.generate_next_client_order_id()
+                order, local_update_time_point=now_time_point, status=OrderStatus.CREATE_IN_FLIGHT, client_order_id=self.generate_next_client_order_id()
             )
         else:
-            return dataclasses.replace(order, local_update_time_point=time_point_now(), status=OrderStatus.CREATE_IN_FLIGHT)
+            return dataclasses.replace(order, local_update_time_point=now_time_point, status=OrderStatus.CREATE_IN_FLIGHT)
 
-    async def cancel_order(self, *, symbol, order_id=None, client_order_id=None, trade_api_method_preference=None):
+    async def cancel_order(self, *, symbol, order_id=None, client_order_id=None, trade_api_method_preference=None, local_update_time_point=None):
+        now_time_point = local_update_time_point if local_update_time_point else time_point_now()
         self.replace_order(
-            symbol=symbol, order_id=order_id, client_order_id=client_order_id, local_update_time_point=time_point_now(), status=OrderStatus.CANCEL_IN_FLIGHT
+            symbol=symbol, order_id=order_id, client_order_id=client_order_id, local_update_time_point=now_time_point, status=OrderStatus.CANCEL_IN_FLIGHT
         )
 
         if (
@@ -1113,7 +1127,7 @@ class Exchange(ExchangeApi):
                 ),
             )
 
-    async def cancel_orders(self, *, symbol=None, trade_api_method_preference=None):
+    async def cancel_orders(self, *, symbol=None, trade_api_method_preference=None, local_update_time_point=None):
         if symbol:
             if symbol in self.orders:
                 for order in self.orders[symbol]:
@@ -1123,6 +1137,7 @@ class Exchange(ExchangeApi):
                             order_id=order.order_id,
                             client_order_id=order.client_order_id,
                             trade_api_method_preference=trade_api_method_preference,
+                            local_update_time_point=local_update_time_point,
                         )
         else:
             for symbol, orders_for_symbol in self.orders.items():
@@ -1133,6 +1148,7 @@ class Exchange(ExchangeApi):
                             order_id=order.order_id,
                             client_order_id=order.client_order_id,
                             trade_api_method_preference=trade_api_method_preference,
+                            local_update_time_point=local_update_time_point,
                         )
 
     def is_instrument_type_valid(self, *, instrument_type):
@@ -2239,7 +2255,7 @@ class Exchange(ExchangeApi):
                 if exchange_create_time_point is None and order.exchange_create_time_point is not None:
                     exchange_create_time_point = order.exchange_create_time_point
 
-                local_update_time_point = time_point_now()
+                local_update_time_point = order.local_update_time_point if order.local_update_time_point else time_point_now()
                 status = order.status
 
                 extra_data = order_to_update.extra_data
