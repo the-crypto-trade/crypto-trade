@@ -950,7 +950,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_rest_account_fetch_balance())
 
-        if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start) and self.trades:
+        if self.remove_historical_trade_interval_seconds and (self.subscribe_trade or self.fetch_historical_trade_at_start):
 
             async def start_periodic_remove_historical_trade():
                 try:
@@ -962,7 +962,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_trade())
 
-        if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start) and self.ohlcvs:
+        if self.remove_historical_ohlcv_interval_seconds and (self.subscribe_ohlcv or self.fetch_historical_ohlcv_at_start):
 
             async def start_periodic_remove_historical_ohlcv():
                 try:
@@ -974,7 +974,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_ohlcv())
 
-        if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start) and self.orders:
+        if self.remove_historical_order_interval_seconds and (self.subscribe_order or self.fetch_historical_order_at_start):
 
             async def start_periodic_remove_historical_order():
                 try:
@@ -986,7 +986,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_remove_historical_order())
 
-        if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start) and self.fills:
+        if self.remove_historical_fill_interval_seconds and (self.subscribe_fill or self.fetch_historical_fill_at_start):
 
             async def start_periodic_remove_historical_fill():
                 try:
@@ -2344,11 +2344,12 @@ class Exchange(ExchangeApi):
 
         if self.keep_historical_ohlcv_seconds:
             for symbol, ohlcvs_for_symbol in self.ohlcvs.items():
-                head_start_unix_timestamp_seconds = ohlcvs_for_symbol[0].start_unix_timestamp_seconds
-                earliest_start_unix_timestamp_seconds_to_keep = ohlcvs_for_symbol[-1].start_unix_timestamp_seconds - self.keep_historical_ohlcv_seconds
+                if ohlcvs_for_symbol:
+                    head_start_unix_timestamp_seconds = ohlcvs_for_symbol[0].start_unix_timestamp_seconds
+                    earliest_start_unix_timestamp_seconds_to_keep = ohlcvs_for_symbol[-1].start_unix_timestamp_seconds - self.keep_historical_ohlcv_seconds
 
-                if head_start_unix_timestamp_seconds < earliest_start_unix_timestamp_seconds_to_keep:
-                    self.ohlcvs[symbol] = [x for x in ohlcvs_for_symbol if x.start_unix_timestamp_seconds >= earliest_start_unix_timestamp_seconds_to_keep]
+                    if head_start_unix_timestamp_seconds < earliest_start_unix_timestamp_seconds_to_keep:
+                        self.ohlcvs[symbol] = [x for x in ohlcvs_for_symbol if x.start_unix_timestamp_seconds >= earliest_start_unix_timestamp_seconds_to_keep]
 
         self.logger.debug("self.ohlcvs", self.ohlcvs)
 
@@ -2357,23 +2358,24 @@ class Exchange(ExchangeApi):
 
         if self.keep_historical_order_seconds:
             for symbol, orders_for_symbol in self.orders.items():
-                latest_local_update_time_point = None
-                for order in orders_for_symbol:
-                    if (
-                        order.is_closed
-                        and order.local_update_time_point is not None
-                        and (latest_local_update_time_point is None or order.local_update_time_point > latest_local_update_time_point)
-                    ):
-                        latest_local_update_time_point = order.local_update_time_point
+                if orders_for_symbol:
+                    latest_local_update_time_point = None
+                    for order in orders_for_symbol:
+                        if (
+                            order.is_closed
+                            and order.local_update_time_point is not None
+                            and (latest_local_update_time_point is None or order.local_update_time_point > latest_local_update_time_point)
+                        ):
+                            latest_local_update_time_point = order.local_update_time_point
 
-                if latest_local_update_time_point is not None:
-                    earliest_local_update_time_point_to_keep = latest_local_update_time_point[0] - self.keep_historical_order_seconds
-                    self.orders[symbol] = [
-                        order
-                        for order in self.orders[symbol]
-                        if not order.is_closed
-                        or (order.local_update_time_point is not None and order.local_update_time_point[0] >= earliest_local_update_time_point_to_keep)
-                    ]
+                    if latest_local_update_time_point is not None:
+                        earliest_local_update_time_point_to_keep = latest_local_update_time_point[0] - self.keep_historical_order_seconds
+                        self.orders[symbol] = [
+                            order
+                            for order in self.orders[symbol]
+                            if not order.is_closed
+                            or (order.local_update_time_point is not None and order.local_update_time_point[0] >= earliest_local_update_time_point_to_keep)
+                        ]
 
         self.logger.debug("self.orders", self.orders)
 
