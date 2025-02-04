@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from enum import IntEnum
 from math import ceil, floor
@@ -458,6 +458,10 @@ def convert_time_point_to_unix_timestamp_seconds(*, time_point):
 
 def convert_time_point_delta_to_seconds(*, time_point_delta):
     return time_point_delta[0] + time_point_delta[1] / one_billion
+
+
+def convert_time_point_to_datetime(*, time_point):
+    return datetime.fromtimestamp(time_point[0], tz=timezone.utc) + timedelta(microseconds=time_point[1] / 1000)
 
 
 def convert_list_to_sublists(*, input, sublist_length):
