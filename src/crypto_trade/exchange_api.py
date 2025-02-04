@@ -2196,6 +2196,12 @@ class Exchange(ExchangeApi):
             index, order = index_and_order
             self.orders[symbol][index] = dataclasses.replace(order, **kwargs)
 
+    def remove_order(self, *, symbol, order_id=None, client_order_id=None):
+        index_and_order = self.get_order(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
+        if index_and_order:
+            index, order = index_and_order
+            self.orders[symbol].pop(index)
+
     def update_order(self, *, order):
         index_and_order_to_update = self.get_order(symbol=order.symbol, order_id=order.order_id, client_order_id=order.client_order_id)
         if index_and_order_to_update:
@@ -2329,7 +2335,8 @@ class Exchange(ExchangeApi):
         self.logger.trace("self.trades", self.trades)
 
         if self.keep_historical_trade_seconds:
-            for symbol, trades_for_symbol in self.trades.items():
+            for symbol in self.trades.keys():
+                trades_for_symbol = self.trades[symbol]
                 if trades_for_symbol:
                     head_exchange_update_time_point = trades_for_symbol[0].exchange_update_time_point[0]
                     earliest_exchange_update_time_point_to_keep = trades_for_symbol[-1].exchange_update_time_point[0] - self.keep_historical_trade_seconds
@@ -2343,7 +2350,8 @@ class Exchange(ExchangeApi):
         self.logger.trace("self.ohlcvs", self.ohlcvs)
 
         if self.keep_historical_ohlcv_seconds:
-            for symbol, ohlcvs_for_symbol in self.ohlcvs.items():
+            for symbol in self.ohlcvs.keys():
+                ohlcvs_for_symbol = self.ohlcvs[symbol]
                 if ohlcvs_for_symbol:
                     head_start_unix_timestamp_seconds = ohlcvs_for_symbol[0].start_unix_timestamp_seconds
                     earliest_start_unix_timestamp_seconds_to_keep = ohlcvs_for_symbol[-1].start_unix_timestamp_seconds - self.keep_historical_ohlcv_seconds
@@ -2357,7 +2365,8 @@ class Exchange(ExchangeApi):
         self.logger.trace("self.orders", self.orders)
 
         if self.keep_historical_order_seconds:
-            for symbol, orders_for_symbol in self.orders.items():
+            for symbol in self.orders.keys():
+                orders_for_symbol = self.orders[symbol]
                 if orders_for_symbol:
                     latest_local_update_time_point = None
                     for order in orders_for_symbol:
@@ -2372,7 +2381,7 @@ class Exchange(ExchangeApi):
                         earliest_local_update_time_point_to_keep = latest_local_update_time_point[0] - self.keep_historical_order_seconds
                         self.orders[symbol] = [
                             order
-                            for order in self.orders[symbol]
+                            for order in orders_for_symbol
                             if not order.is_closed
                             or (order.local_update_time_point is not None and order.local_update_time_point[0] >= earliest_local_update_time_point_to_keep)
                         ]
@@ -2383,7 +2392,8 @@ class Exchange(ExchangeApi):
         self.logger.trace("self.fills", self.fills)
 
         if self.keep_historical_fill_seconds:
-            for symbol, fills_for_symbol in self.fills.items():
+            for symbol in self.fills.keys():
+                fills_for_symbol = self.fills[symbol]
                 if fills_for_symbol:
                     head_exchange_update_time_point = fills_for_symbol[0].exchange_update_time_point[0]
                     earliest_exchange_update_time_point_to_keep = fills_for_symbol[-1].exchange_update_time_point[0] - self.keep_historical_fill_seconds
