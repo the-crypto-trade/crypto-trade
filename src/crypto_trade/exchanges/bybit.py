@@ -74,13 +74,13 @@ class Bybit(Exchange):
             self.websocket_market_data_channel_symbols_limit = None
 
     # def is_instrument_type_valid(self, *, instrument_type):
-    #     return instrument_type in {
+    #     return instrument_type in (
     #         BybitInstrumentType.SPOT,
     #         BybitInstrumentType.MARGIN,
     #         BybitInstrumentType.SWAP,
     #         BybitInstrumentType.FUTURES,
     #         BybitInstrumentType.OPTION,
-    #     }
+    #     )
 
     # def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
     #     if self.instrument_type == BybitInstrumentType.SPOT or self.instrument_type == BybitInstrumentType.MARGIN:
@@ -261,7 +261,7 @@ class Bybit(Exchange):
     #             contract_size=normalize_decimal_string(input=x["ctVal"]),
     #             contract_multiplier=normalize_decimal_string(input=x["ctMult"]),
     #             expiry_time=int(expTime) // 1000 if (expTime := x["expTime"]) else None,
-    #             is_open_for_trade=x["state"] in {"live", "preopen"},
+    #             is_open_for_trade=x["state"] in ("live", "preopen"),
     #         )
     #         for x in json_deserialized_payload["data"]
     #     ]
@@ -502,7 +502,7 @@ class Bybit(Exchange):
     #         if (
     #             rest_response.status_code == 200
     #             and rest_response.json_deserialized_payload
-    #             and rest_response.json_deserialized_payload.get("code") in {"51001", "51603"}
+    #             and rest_response.json_deserialized_payload.get("code") in ("51001", "51603")
     #         ):
     #             now_time_point = time_point_now()
     #             self.replace_order(

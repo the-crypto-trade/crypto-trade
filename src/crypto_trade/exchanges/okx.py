@@ -97,13 +97,13 @@ class Okx(Exchange):
             self.rest_account_fetch_position_period_seconds = None
 
     def is_instrument_type_valid(self, *, instrument_type):
-        return instrument_type in {
+        return instrument_type in (
             OkxInstrumentType.SPOT,
             OkxInstrumentType.MARGIN,
             OkxInstrumentType.SWAP,
             OkxInstrumentType.FUTURES,
             OkxInstrumentType.OPTION,
-        }
+        )
 
     def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
         if self.instrument_type == OkxInstrumentType.SPOT or self.instrument_type == OkxInstrumentType.MARGIN:
@@ -284,7 +284,7 @@ class Okx(Exchange):
                 contract_size=normalize_decimal_string(input=x["ctVal"]),
                 contract_multiplier=normalize_decimal_string(input=x["ctMult"]),
                 expiry_time=int(expTime) // 1000 if (expTime := x["expTime"]) else None,
-                is_open_for_trade=x["state"] in {"live", "preopen"},
+                is_open_for_trade=x["state"] in ("live", "preopen"),
             )
             for x in json_deserialized_payload["data"]
         ]
@@ -525,7 +525,7 @@ class Okx(Exchange):
             if (
                 rest_response.status_code == 200
                 and rest_response.json_deserialized_payload
-                and rest_response.json_deserialized_payload.get("code") in {"51001", "51603"}
+                and rest_response.json_deserialized_payload.get("code") in ("51001", "51603")
             ):
                 now_time_point = time_point_now()
                 self.replace_order(
