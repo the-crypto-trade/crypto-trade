@@ -1772,7 +1772,7 @@ class Exchange(ExchangeApi):
 
                 if self.websocket_connection_auto_reconnect and not self.stopped:
                     url_with_query_params = websocket_connection.url_with_query_params
-                    next_websocket_reconnect_delay_seconds = self.generate_next_websocket_reconnect_delay_seconds(url_with_query_params=url_with_query_params)
+                    next_websocket_reconnect_delay_seconds = self.calculate_next_websocket_reconnect_delay_seconds(url_with_query_params=url_with_query_params)
                     self.logger.warning(f"delay for {next_websocket_reconnect_delay_seconds} seconds before websocket reconnect to {url_with_query_params}")
                     await asyncio.sleep(next_websocket_reconnect_delay_seconds)
                 else:
@@ -2156,14 +2156,14 @@ class Exchange(ExchangeApi):
 
         self.create_task(coro=start_reset_websocket_reconnect_delay())
 
-    def generate_next_websocket_reconnect_delay_seconds(self, *, url_with_query_params):
+    def calculate_next_websocket_reconnect_delay_seconds(self, *, url_with_query_params):
         if url_with_query_params not in self.websocket_reconnect_delay_seconds:
-            self.websocket_reconnect_delay_seconds[url_with_query_params] = self.websocket_reconnect_delay_seconds_exponential_backoff_initial
+            self.websocket_reconnect_delay_seconds[url_with_query_params] = 0
         else:
             self.websocket_reconnect_delay_seconds[url_with_query_params] = min(
                 self.websocket_reconnect_delay_seconds[url_with_query_params] * self.websocket_reconnect_delay_seconds_exponential_backoff_base,
                 self.websocket_reconnect_delay_seconds_exponential_backoff_max,
-            )
+            ) if self.websocket_reconnect_delay_seconds[url_with_query_params] > 0 else self.websocket_reconnect_delay_seconds_exponential_backoff_initial
         return self.websocket_reconnect_delay_seconds[url_with_query_params]
 
     def update_bbo(self, *, bbo):
