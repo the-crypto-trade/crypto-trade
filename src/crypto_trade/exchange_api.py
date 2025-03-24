@@ -501,8 +501,8 @@ class Position(BaseModel):
     entry_price: Optional[str] = None
     mark_price: Optional[str] = None
     leverage: Optional[str] = None
-    initial_margin: Optional[str] = None
-    maintenance_margin: Optional[str] = None
+    initial_margin_ratio: Optional[str] = None
+    maintenance_margin_ratio: Optional[str] = None
     unrealized_pnl: Optional[str] = None
     liquidation_price: Optional[str] = None
 
@@ -547,20 +547,20 @@ class Position(BaseModel):
         return Decimal(self.leverage) if self.leverage else None
 
     @cached_property
-    def initial_margin_as_float(self):
-        return float(self.initial_margin) if self.initial_margin else None
+    def initial_margin_ratio_as_float(self):
+        return float(self.initial_margin_ratio) if self.initial_margin_ratio else None
 
     @cached_property
-    def initial_margin_as_decimal(self):
-        return Decimal(self.initial_margin) if self.initial_margin else None
+    def initial_margin_ratio_as_decimal(self):
+        return Decimal(self.initial_margin_ratio) if self.initial_margin_ratio else None
 
     @cached_property
-    def maintenance_margin_as_float(self):
-        return float(self.maintenance_margin) if self.maintenance_margin else None
+    def maintenance_margin_ratio_as_float(self):
+        return float(self.maintenance_margin_ratio) if self.maintenance_margin_ratio else None
 
     @cached_property
-    def maintenance_margin_as_decimal(self):
-        return Decimal(self.maintenance_margin) if self.maintenance_margin else None
+    def maintenance_margin_ratio_as_decimal(self):
+        return Decimal(self.maintenance_margin_ratio) if self.maintenance_margin_ratio else None
 
     @cached_property
     def unrealized_pnl_as_float(self):

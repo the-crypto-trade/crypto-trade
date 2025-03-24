@@ -991,8 +991,8 @@ class Okx(Exchange):
             entry_price=input["avgPx"],
             mark_price=input["markPx"],
             leverage=input["lever"],
-            initial_margin=input["imr"],
-            maintenance_margin=input["mmr"],
+            initial_margin_ratio=input["imr"],
+            maintenance_margin_ratio=input["mmr"],
             unrealized_pnl=input["upl"],
             liquidation_price=input["liqPx"],
         )
