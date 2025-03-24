@@ -613,6 +613,7 @@ class Exchange(ExchangeApi):
         # ohlcv
         subscribe_ohlcv: bool = False,
         ohlcv_interval_seconds: int = 60,
+        is_ohlcv_interval_aligned_to_utc=True,
         fetch_historical_ohlcv_at_start: bool = False,
         fetch_historical_ohlcv_start_unix_timestamp_seconds: Optional[int] = None,
         fetch_historical_ohlcv_end_unix_timestamp_seconds: Optional[int] = None,
@@ -709,6 +710,7 @@ class Exchange(ExchangeApi):
         self.remove_historical_trade_interval_seconds = remove_historical_trade_interval_seconds
 
         self.ohlcv_interval_seconds = ohlcv_interval_seconds
+        self.is_ohlcv_interval_aligned_to_utc = is_ohlcv_interval_aligned_to_utc
         self.subscribe_ohlcv = subscribe_ohlcv
         self.fetch_historical_ohlcv_at_start = fetch_historical_ohlcv_at_start
         self.fetch_historical_ohlcv_start_unix_timestamp_seconds = fetch_historical_ohlcv_start_unix_timestamp_seconds

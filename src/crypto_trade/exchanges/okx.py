@@ -1011,6 +1011,6 @@ class Okx(Exchange):
         elif ohlcv_interval_seconds < 3600:
             return f"{ohlcv_interval_seconds//60}m"
         elif ohlcv_interval_seconds < 86400:
-            return f"{ohlcv_interval_seconds//3600}H"
+            return f"{ohlcv_interval_seconds//3600}H" + ("utc" if ohlcv_interval_seconds >= 21600 and self.is_ohlcv_interval_aligned_to_utc else "")
         else:
-            return f"{ohlcv_interval_seconds//86400}D"
+            return f"{ohlcv_interval_seconds//86400}D" + ("utc" if self.is_ohlcv_interval_aligned_to_utc else "")
