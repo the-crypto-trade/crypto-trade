@@ -2162,10 +2162,14 @@ class Exchange(ExchangeApi):
         if url_with_query_params not in self.websocket_reconnect_delay_seconds:
             self.websocket_reconnect_delay_seconds[url_with_query_params] = 0
         else:
-            self.websocket_reconnect_delay_seconds[url_with_query_params] = min(
-                self.websocket_reconnect_delay_seconds[url_with_query_params] * self.websocket_reconnect_delay_seconds_exponential_backoff_base,
-                self.websocket_reconnect_delay_seconds_exponential_backoff_max,
-            ) if self.websocket_reconnect_delay_seconds[url_with_query_params] > 0 else self.websocket_reconnect_delay_seconds_exponential_backoff_initial
+            self.websocket_reconnect_delay_seconds[url_with_query_params] = (
+                min(
+                    self.websocket_reconnect_delay_seconds[url_with_query_params] * self.websocket_reconnect_delay_seconds_exponential_backoff_base,
+                    self.websocket_reconnect_delay_seconds_exponential_backoff_max,
+                )
+                if self.websocket_reconnect_delay_seconds[url_with_query_params] > 0
+                else self.websocket_reconnect_delay_seconds_exponential_backoff_initial
+            )
         return self.websocket_reconnect_delay_seconds[url_with_query_params]
 
     def update_bbo(self, *, bbo):
