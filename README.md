@@ -5,9 +5,9 @@
 - [Crypto Trade](#crypto-trade)
   - [Branches](#branches)
   - [Installation](#installation)
-    - [Install From PyPi](#install-from-pypi)
+    - [Install From Github](#install-from-github)
     - [Install Locally](#install-locally)
-  - [Public API](#public-api)
+  - [API](#api)
   - [Examples](#examples)
   - [Thread Safety](#thread-safety)
   - [Performance Tuning](#performance-tuning)
@@ -49,8 +49,8 @@ For developers:
 
 ## API
 * The following has API backward compatibility guarantee.
-* [Initialize: see the constructor in class ExchangeBase.](src/crypto_trade/core/exchanges/exchange_base.py)
-* [Call: see the methods in class ExchangeInterface.](src/crypto_trade/core/exchanges/exchange_interface.py)
+* [Initialize: see the constructor in class Exchange.](src/crypto_trade/exchanges/exchange_api.py)
+* [API Call: see the methods in class ExchangeApi.](src/crypto_trade/exchanges/exchange_api.py)
 * All variables and functions are public.
 
 ## Examples

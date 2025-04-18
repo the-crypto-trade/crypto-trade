@@ -1146,7 +1146,9 @@ class Exchange(ExchangeApi):
         if symbol:
             if symbol in self.orders:
                 for order in self.orders[symbol]:
-                    if order.is_eligible_to_cancel:
+                    if order.is_eligible_to_cancel and self.cancel_orders_filter_order(
+                        order=order, order_ids=order_ids, client_order_ids=client_order_ids, margin_asset=margin_asset
+                    ):
                         await self.cancel_order(
                             symbol=symbol,
                             order_id=order.order_id,
@@ -1157,7 +1159,9 @@ class Exchange(ExchangeApi):
         else:
             for symbol, orders_for_symbol in self.orders.items():
                 for order in orders_for_symbol:
-                    if order.is_eligible_to_cancel:
+                    if order.is_eligible_to_cancel and self.cancel_orders_filter_order(
+                        order=order, order_ids=order_ids, client_order_ids=client_order_ids, margin_asset=margin_asset
+                    ):
                         await self.cancel_order(
                             symbol=symbol,
                             order_id=order.order_id,
@@ -1165,6 +1169,13 @@ class Exchange(ExchangeApi):
                             trade_api_method_preference=trade_api_method_preference,
                             local_update_time_point=local_update_time_point,
                         )
+
+    def cancel_orders_filter_order(self, *, order, order_ids=None, client_order_ids=None, margin_asset=None):
+        return (
+            (not order_ids or order.order_id in order_ids)
+            and (not client_order_ids or order.client_order_id in client_order_ids)
+            and (not margin_asset or order.margin_asset == margin_asset)
+        )
 
     def is_instrument_type_valid(self, *, instrument_type):
         return True
@@ -2279,7 +2290,7 @@ class Exchange(ExchangeApi):
                 is_reduce_only = order_to_update.is_reduce_only
 
                 margin_type = order_to_update.margin_type
-                margin_asset = order_to_update.margin_asset or self.margin_asset
+                margin_asset = order_to_update.margin_asset or self.margin_asset or self.all_instrument_information[symbol].margin_asset
 
                 extra_params = order_to_update.extra_params
 
