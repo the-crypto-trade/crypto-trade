@@ -54,20 +54,25 @@ class Okx(Exchange):
         self.rest_market_data_fetch_all_instrument_information_path = "/api/v5/public/instruments"
         self.rest_market_data_fetch_bbo_path = "/api/v5/market/tickers"
         self.rest_market_data_fetch_historical_trade_path = "/api/v5/market/history-trades"
+        self.rest_market_data_fetch_historical_trade_limit = 100
         self.rest_market_data_fetch_historical_ohlcv_path = "/api/v5/market/history-candles"
+        self.rest_market_data_fetch_historical_ohlcv_limit = 100
         self.rest_account_create_order_path = "/api/v5/trade/order"
         self.rest_account_cancel_order_path = "/api/v5/trade/cancel-order"
         self.rest_account_fetch_order_path = "/api/v5/trade/order"
         self.rest_account_fetch_open_order_path = "/api/v5/trade/orders-pending"
+        self.rest_account_fetch_open_order_limit = 100
         self.rest_account_fetch_position_path = "/api/v5/account/positions"
         self.rest_account_fetch_balance_path = "/api/v5/account/balance"
         self.rest_account_fetch_historical_order_path = "/api/v5/trade/orders-history"
         self.rest_account_fetch_historical_order_path_2 = "/api/v5/trade/orders-history-archive"
+        self.rest_account_fetch_historical_order_limit = 100
         self.rest_account_fetch_historical_fill_path = "/api/v5/trade/fills"
         self.rest_account_fetch_historical_fill_path_2 = "/api/v5/trade/fills-history"
+        self.rest_account_fetch_historical_fill_limit = 100
 
         self.websocket_market_data_base_url = "wss://ws.okx.com:8443"
-        if self.is_demo_trading:
+        if self.is_paper_trading:
             self.websocket_market_data_base_url = "wss://wspap.okx.com:8443"
         self.websocket_account_base_url = self.websocket_market_data_base_url
         self.websocket_market_data_path = "/ws/v5/public"
@@ -90,7 +95,7 @@ class Okx(Exchange):
             "mmp_canceled": OrderStatus.CANCELED,
         }
 
-        self.broker_id = "9cbc6a17a1fcBCDE"
+        self.api_broker_id = "9cbc6a17a1fcBCDE"
 
         if self.instrument_type == OkxInstrumentType.SPOT:
             self.subscribe_position = False
@@ -132,7 +137,7 @@ class Okx(Exchange):
             ).digest()
         ).decode("utf-8")
 
-        if self.is_demo_trading:
+        if self.is_paper_trading:
             headers["x-simulated-trading"] = "1"
 
     def rest_market_data_fetch_all_instrument_information_create_rest_request_function(self):
@@ -141,33 +146,31 @@ class Okx(Exchange):
         )
 
     def rest_market_data_fetch_bbo_create_rest_request_function(self):
-
         return self.rest_market_data_create_get_request_function(
             path=self.rest_market_data_fetch_bbo_path,
             query_params={"instType": f"{OkxInstrumentType.SPOT if self.instrument_type == OkxInstrumentType.MARGIN else self.instrument_type}"},
         )
 
     def rest_market_data_fetch_historical_trade_create_rest_request_function(self, *, symbol):
-        query_params = {"instId": symbol, "type": 1}
-        if self.rest_market_data_fetch_historical_trade_limit:
-            query_params["limit"] = self.rest_market_data_fetch_historical_trade_limit
-
-        return self.rest_market_data_create_get_request_function(path=self.rest_market_data_fetch_historical_trade_path, query_params=query_params)
+        return self.rest_market_data_create_get_request_function(
+            path=self.rest_market_data_fetch_historical_trade_path,
+            query_params={"instId": symbol, "type": 1, "limit": self.rest_market_data_fetch_historical_trade_limit},
+        )
 
     def rest_market_data_fetch_historical_ohlcv_create_rest_request_function(self, *, symbol):
-        query_params = {
-            "instId": symbol,
-            "after": (
-                self.fetch_historical_ohlcv_end_unix_timestamp_seconds // self.ohlcv_interval_seconds * self.ohlcv_interval_seconds
-                + self.ohlcv_interval_seconds
-            )
-            * 1000,
-            "bar": self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds),
-        }
-        if self.rest_market_data_fetch_historical_ohlcv_limit:
-            query_params["limit"] = self.rest_market_data_fetch_historical_ohlcv_limit
-
-        return self.rest_market_data_create_get_request_function(path=self.rest_market_data_fetch_historical_ohlcv_path, query_params=query_params)
+        return self.rest_market_data_create_get_request_function(
+            path=self.rest_market_data_fetch_historical_ohlcv_path,
+            query_params={
+                "instId": symbol,
+                "after": (
+                    self.fetch_historical_ohlcv_end_unix_timestamp_seconds // self.ohlcv_interval_seconds * self.ohlcv_interval_seconds
+                    + self.ohlcv_interval_seconds
+                )
+                * 1000,
+                "bar": self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds),
+                "limit": self.rest_market_data_fetch_historical_ohlcv_limit,
+            },
+        )
 
     def rest_account_create_order_create_rest_request_function(self, *, order):
         return self.rest_account_create_post_request_function_with_signature(
@@ -205,18 +208,16 @@ class Okx(Exchange):
         return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_balance_path)
 
     def rest_account_fetch_historical_order_create_rest_request_function(self, *, symbol):
-        query_params = {"instType": f"{self.instrument_type}", "instId": symbol}
-        if self.rest_account_fetch_historical_order_limit:
-            query_params["limit"] = self.rest_account_fetch_historical_order_limit
-
-        return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_historical_order_path, query_params=query_params)
+        return self.rest_account_create_get_request_function_with_signature(
+            path=self.rest_account_fetch_historical_order_path,
+            query_params={"instType": f"{self.instrument_type}", "instId": symbol, "limit": self.rest_account_fetch_historical_order_limit},
+        )
 
     def rest_account_fetch_historical_fill_create_rest_request_function(self, *, symbol):
-        query_params = {"instType": f"{self.instrument_type}", "instId": symbol}
-        if self.rest_account_fetch_historical_fill_limit:
-            query_params["limit"] = self.rest_account_fetch_historical_fill_limit
-
-        return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_historical_fill_path, query_params=query_params)
+        return self.rest_account_create_get_request_function_with_signature(
+            path=self.rest_account_fetch_historical_fill_path,
+            query_params={"instType": f"{self.instrument_type}", "instId": symbol, "limit": self.rest_account_fetch_historical_fill_limit},
+        )
 
     def is_rest_response_success(self, *, rest_response):
         return (
@@ -329,11 +330,10 @@ class Okx(Exchange):
                 self.fetch_historical_trade_start_unix_timestamp_seconds is None
                 or exchange_update_time_point[0] >= self.fetch_historical_trade_start_unix_timestamp_seconds
             ):
-                query_params = {"instId": head["instId"], "type": 1, "after": after}
-                if self.rest_market_data_fetch_historical_trade_limit:
-                    query_params["limit"] = self.rest_market_data_fetch_historical_trade_limit
-
-                return self.rest_market_data_create_get_request_function(path=self.rest_market_data_fetch_historical_trade_path, query_params=query_params)
+                return self.rest_market_data_create_get_request_function(
+                    path=self.rest_market_data_fetch_historical_trade_path,
+                    query_params={"instId": head["instId"], "type": 1, "after": after, "limit": self.rest_market_data_fetch_historical_trade_limit},
+                )
 
     def convert_rest_response_for_historical_ohlcv(self, *, json_deserialized_payload, rest_request):
         inst_id = rest_request.query_params["instId"]
@@ -355,15 +355,15 @@ class Okx(Exchange):
                 after = tail_ts
 
             if self.fetch_historical_ohlcv_start_unix_timestamp_seconds is None or after // 1000 >= self.fetch_historical_ohlcv_start_unix_timestamp_seconds:
-                query_params = {
-                    "instId": rest_request.query_params["instId"],
-                    "after": after,
-                    "bar": self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds),
-                }
-                if self.rest_market_data_fetch_historical_ohlcv_limit:
-                    query_params["limit"] = self.rest_market_data_fetch_historical_ohlcv_limit
-
-                return self.rest_market_data_create_get_request_function(path=self.rest_market_data_fetch_historical_ohlcv_path, query_params=query_params)
+                return self.rest_market_data_create_get_request_function(
+                    path=self.rest_market_data_fetch_historical_ohlcv_path,
+                    query_params={
+                        "instId": rest_request.query_params["instId"],
+                        "after": after,
+                        "bar": self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds),
+                        "limit": self.rest_market_data_fetch_historical_ohlcv_limit,
+                    },
+                )
 
     def convert_rest_response_for_create_order(self, *, json_deserialized_payload, rest_request):
         x = json_deserialized_payload["data"][0]
@@ -411,12 +411,11 @@ class Okx(Exchange):
                 after = head_ord_id
             else:
                 after = tail_ord_id
-            query_params = {"instType": f"{self.instrument_type}", "after": after}
 
-            if self.rest_account_fetch_open_order_limit:
-                query_params["limit"] = self.rest_account_fetch_open_order_limit
-
-            return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_open_order_path, query_params=query_params)
+            return self.rest_account_create_get_request_function_with_signature(
+                path=self.rest_account_fetch_open_order_path,
+                query_params={"instType": f"{self.instrument_type}", "after": after, "limit": self.rest_account_fetch_open_order_limit},
+            )
 
     def convert_rest_response_for_fetch_position(self, *, json_deserialized_payload, rest_request):
         return [self.convert_dict_to_position(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload["data"]]
@@ -452,15 +451,23 @@ class Okx(Exchange):
                 or exchange_create_time_point[0] >= self.fetch_historical_order_start_unix_timestamp_seconds
             ):
                 return self.rest_account_create_get_request_function_with_signature(
-                    path=rest_request.path, query_params={"instType": f"{self.instrument_type}", "instId": rest_request.query_params["instId"], "after": after}
+                    path=rest_request.path,
+                    query_params={
+                        "instType": f"{self.instrument_type}",
+                        "instId": rest_request.query_params["instId"],
+                        "after": after,
+                        "limit": self.rest_account_fetch_historical_order_limit,
+                    },
                 )
         elif rest_request.path == self.rest_account_fetch_historical_order_path:
-            query_params = {"instType": f"{self.instrument_type}", "instId": rest_request.query_params["instId"]}
+            query_params = {
+                "instType": f"{self.instrument_type}",
+                "instId": rest_request.query_params["instId"],
+                "limit": self.rest_account_fetch_historical_order_limit,
+            }
 
             if "after" in rest_request.query_params:
                 query_params["after"] = rest_request.query_params["after"]
-            if self.rest_account_fetch_historical_order_limit:
-                query_params["limit"] = self.rest_account_fetch_historical_order_limit
 
             return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_historical_order_path_2, query_params=query_params)
 
@@ -492,15 +499,23 @@ class Okx(Exchange):
                 or exchange_update_time_point[0] >= self.fetch_historical_fill_start_unix_timestamp_seconds
             ):
                 return self.rest_account_create_get_request_function_with_signature(
-                    path=rest_request.path, query_params={"instType": f"{self.instrument_type}", "instId": rest_request.query_params["instId"], "after": after}
+                    path=rest_request.path,
+                    query_params={
+                        "instType": f"{self.instrument_type}",
+                        "instId": rest_request.query_params["instId"],
+                        "after": after,
+                        "limit": self.rest_account_fetch_historical_fill_limit,
+                    },
                 )
         elif rest_request.path == self.rest_account_fetch_historical_fill_path:
-            query_params = {"instType": f"{self.instrument_type}", "instId": rest_request.query_params["instId"]}
+            query_params = {
+                "instType": f"{self.instrument_type}",
+                "instId": rest_request.query_params["instId"],
+                "limit": self.rest_account_fetch_historical_fill_limit,
+            }
 
             if "after" in rest_request.query_params:
                 query_params["after"] = rest_request.query_params["after"]
-            if self.rest_account_fetch_historical_fill_limit:
-                query_params["limit"] = self.rest_account_fetch_historical_fill_limit
 
             return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_historical_fill_path_2, query_params=query_params)
 
@@ -747,10 +762,10 @@ class Okx(Exchange):
                 api_method=ApiMethod.WEBSOCKET,
                 symbol=inst_id,
                 exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["ts"]),
-                best_bid_price=x["bids"][0][0] if x["bids"] else None,
-                best_bid_size=x["bids"][0][1] if x["bids"] else None,
-                best_ask_price=x["asks"][0][0] if x["asks"] else None,
-                best_ask_size=x["asks"][0][1] if x["asks"] else None,
+                best_bid_price=x["bids"][0][0] if x.get("bids") else None,
+                best_bid_size=x["bids"][0][1] if x.get("bids") else None,
+                best_ask_price=x["asks"][0][0] if x.get("asks") else None,
+                best_ask_size=x["asks"][0][1] if x.get("asks") else None,
             )
             for x in json_deserialized_payload["data"]
         ]
@@ -860,7 +875,7 @@ class Okx(Exchange):
             "side": "buy" if order.is_buy else "sell",
             "ordType": ord_type,
             "sz": order.quantity,
-            "tag": self.broker_id,
+            "tag": self.api_broker_id,
         }
         if order.price:
             json_payload["px"] = order.price
@@ -935,9 +950,9 @@ class Okx(Exchange):
         )
 
     def convert_dict_to_fill(self, *, input, api_method, symbol):
-        fill_fee = input.get("fillFee", input["fee"])
-        fill_fee_ccy = input.get("fillFeeCcy", input["feeCcy"])
-        is_rebate = not fill_fee.startswith("-")
+        fill_fee = input.get("fillFee", input.get("fee"))
+        fill_fee_ccy = input.get("fillFeeCcy", input.get("feeCcy"))
+        is_rebate = not fill_fee.startswith("-") if fill_fee else None
 
         return Fill(
             api_method=api_method,
@@ -951,7 +966,7 @@ class Okx(Exchange):
             quantity=input["fillSz"],
             is_maker=input["execType"] == "M" if input.get("execType") else None,
             fee_asset=fill_fee_ccy,
-            fee_quantity=remove_leading_negative_sign_in_string(input=fill_fee),
+            fee_quantity=remove_leading_negative_sign_in_string(input=fill_fee) if fill_fee else None,
             is_rebate=is_rebate,
         )
 
@@ -991,8 +1006,8 @@ class Okx(Exchange):
             entry_price=input["avgPx"],
             mark_price=input["markPx"],
             leverage=input["lever"],
-            initial_margin_ratio=input["imr"],
-            maintenance_margin_ratio=input["mmr"],
+            initial_margin=input["imr"],
+            maintenance_margin=input["mmr"],
             unrealized_pnl=input["upl"],
             liquidation_price=input["liqPx"],
         )

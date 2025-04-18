@@ -86,6 +86,9 @@ class ExchangeApi:
         self,
         *,
         symbol: Optional[str] = None,
+        order_ids: Optional[Iterable[str]] = None,
+        client_order_ids: Optional[Iterable[str]] = None,
+        margin_asset: Optional[str] = None,
         trade_api_method_preference: Optional[ApiMethod] = None,
         local_update_time_point: Optional[Tuple[int, int]] = None,
     ) -> None:
@@ -239,13 +242,14 @@ class Bbo(BaseModel):
 @dataclass(frozen=True, kw_only=True)
 class Trade(BaseModel):
     trade_id: Optional[str] = None
+    is_trade_id_monotonic_increase: Optional[bool] = True
     price: Optional[str] = None
     size: Optional[str] = None
     is_buyer_maker: Optional[bool] = None
 
     @cached_property
     def trade_id_as_int(self):
-        return int(self.trade_id) if self.trade_id else None
+        return int(self.trade_id) if self.trade_id and self.is_trade_id_monotonic_increase else 0
 
     @cached_property
     def price_as_float(self):
@@ -340,6 +344,7 @@ class OrderStatus(IntEnum):
 @dataclass(frozen=True, kw_only=True)
 class Order(BaseModel):
     order_id: Optional[str] = None
+    is_order_id_monotonic_increase = True
     client_order_id: Optional[str] = None
     is_buy: Optional[bool] = None
     price: Optional[str] = None
@@ -367,7 +372,7 @@ class Order(BaseModel):
 
     @cached_property
     def order_id_as_int(self):
-        return int(self.order_id) if self.order_id else None
+        return int(self.order_id) if self.order_id and self.is_order_id_monotonic_increase else 0
 
     @cached_property
     def price_as_float(self):
@@ -455,6 +460,7 @@ class Fill(BaseModel):
     order_id: Optional[str] = None
     client_order_id: Optional[str] = None
     trade_id: Optional[str] = None
+    is_trade_id_monotonic_increase: Optional[bool] = True
     is_buy: Optional[bool] = None
     price: Optional[str] = None
     quantity: Optional[str] = None
@@ -466,7 +472,7 @@ class Fill(BaseModel):
 
     @cached_property
     def trade_id_as_int(self):
-        return int(self.trade_id) if self.trade_id else None
+        return int(self.trade_id) if self.trade_id and self.is_trade_id_monotonic_increase else 0
 
     @cached_property
     def price_as_float(self):
@@ -501,8 +507,8 @@ class Position(BaseModel):
     entry_price: Optional[str] = None
     mark_price: Optional[str] = None
     leverage: Optional[str] = None
-    initial_margin_ratio: Optional[str] = None
-    maintenance_margin_ratio: Optional[str] = None
+    initial_margin: Optional[str] = None
+    maintenance_margin: Optional[str] = None
     unrealized_pnl: Optional[str] = None
     liquidation_price: Optional[str] = None
 
@@ -547,20 +553,20 @@ class Position(BaseModel):
         return Decimal(self.leverage) if self.leverage else None
 
     @cached_property
-    def initial_margin_ratio_as_float(self):
-        return float(self.initial_margin_ratio) if self.initial_margin_ratio else None
+    def initial_margin_as_float(self):
+        return float(self.initial_margin) if self.initial_margin else None
 
     @cached_property
-    def initial_margin_ratio_as_decimal(self):
-        return Decimal(self.initial_margin_ratio) if self.initial_margin_ratio else None
+    def initial_margin_as_decimal(self):
+        return Decimal(self.initial_margin) if self.initial_margin else None
 
     @cached_property
-    def maintenance_margin_ratio_as_float(self):
-        return float(self.maintenance_margin_ratio) if self.maintenance_margin_ratio else None
+    def maintenance_margin_as_float(self):
+        return float(self.maintenance_margin) if self.maintenance_margin else None
 
     @cached_property
-    def maintenance_margin_ratio_as_decimal(self):
-        return Decimal(self.maintenance_margin_ratio) if self.maintenance_margin_ratio else None
+    def maintenance_margin_as_decimal(self):
+        return Decimal(self.maintenance_margin) if self.maintenance_margin else None
 
     @cached_property
     def unrealized_pnl_as_float(self):
@@ -601,6 +607,7 @@ class Exchange(ExchangeApi):
         exchange_id: Optional[str] = None,  # arbitrary user-defined data
         symbols: str | Iterable[str] = "*",  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
         instrument_type: Optional[str] = None,  # Defaults to spot type. See each derived exchange class for allowed values for that exchange.
+        margin_asset: Optional[str] = None,
         # bbo
         subscribe_bbo: bool = False,
         # trade
@@ -620,7 +627,7 @@ class Exchange(ExchangeApi):
         keep_historical_ohlcv_seconds: Optional[int] = 300,  # max historical data time span
         remove_historical_ohlcv_interval_seconds: Optional[int] = 60,  # how often to remove
         # account
-        is_demo_trading: bool = False,
+        is_paper_trading: bool = False,
         api_key: str = "",
         api_secret: str = "",
         api_passphrase: str = "",
@@ -691,6 +698,8 @@ class Exchange(ExchangeApi):
             self.symbols = set(symbols)
 
         self.instrument_type = instrument_type
+        self.margin_asset = margin_asset
+
         if logger:
             self.logger = logger
         else:
@@ -720,7 +729,7 @@ class Exchange(ExchangeApi):
         self.keep_historical_ohlcv_seconds = keep_historical_ohlcv_seconds
         self.remove_historical_ohlcv_interval_seconds = remove_historical_ohlcv_interval_seconds
 
-        self.is_demo_trading = is_demo_trading
+        self.is_paper_trading = is_paper_trading
         self.api_key = api_key
         self.api_secret = api_secret
         self.api_passphrase = api_passphrase
@@ -792,11 +801,12 @@ class Exchange(ExchangeApi):
         else:
             import json
 
-            self.json_deserialize = functools.partial(json.loads, parse_float=lambda x: x, parse_int=lambda x: x)
+            self.json_deserialize = functools.partial(json.loads)
 
         self.rest_market_data_base_url: Optional[str] = None
         self.rest_account_base_url: Optional[str] = None
         self.rest_market_data_fetch_all_instrument_information_path: Optional[str] = None
+        self.rest_market_data_fetch_all_instrument_information_limit: Optional[int] = None
         self.rest_market_data_fetch_bbo_path: Optional[str] = None
         self.rest_market_data_fetch_historical_trade_path: Optional[str] = None
         self.rest_market_data_fetch_historical_trade_limit: Optional[int] = None
@@ -808,6 +818,7 @@ class Exchange(ExchangeApi):
         self.rest_account_fetch_open_order_path: Optional[str] = None
         self.rest_account_fetch_open_order_limit: Optional[int] = None
         self.rest_account_fetch_position_path: Optional[str] = None
+        self.rest_account_fetch_position_limit: Optional[int] = None
         self.rest_account_fetch_balance_path: Optional[str] = None
         self.rest_account_fetch_historical_order_path: Optional[str] = None
         self.rest_account_fetch_historical_order_limit: Optional[int] = None
@@ -833,7 +844,7 @@ class Exchange(ExchangeApi):
 
         self.order_status_mapping: Dict[str, OrderStatus] = {}
 
-        self.broker_id: Optional[str] = None
+        self.api_broker_id: Optional[str] = None
 
         self.next_rest_request_id_int: int = 0
         self.next_websocket_request_id_int: int = 0
@@ -1129,7 +1140,9 @@ class Exchange(ExchangeApi):
                 ),
             )
 
-    async def cancel_orders(self, *, symbol=None, trade_api_method_preference=None, local_update_time_point=None):
+    async def cancel_orders(
+        self, *, symbol=None, order_ids=None, client_order_ids=None, margin_asset=None, trade_api_method_preference=None, local_update_time_point=None
+    ):
         if symbol:
             if symbol in self.orders:
                 for order in self.orders[symbol]:
@@ -1882,6 +1895,19 @@ class Exchange(ExchangeApi):
                 )
             )
 
+        if self.trade_api_method_preference == ApiMethod.WEBSOCKET and (
+            self.websocket_account_base_url != self.websocket_account_trade_base_url
+            or self.websocket_account_path != self.websocket_account_trade_path
+            or self.websocket_account_query_params != self.websocket_account_trade_query_params
+        ):
+            self.create_task(
+                coro=self.start_websocket_connect(
+                    base_url=self.websocket_account_trade_base_url,
+                    path=self.websocket_account_trade_path,
+                    query_params=self.websocket_account_trade_query_params,
+                )
+            )
+
     async def websocket_account_subscribe(self, *, websocket_connection):
         await self.send_websocket_request(
             websocket_connection=websocket_connection, websocket_request=self.websocket_account_update_subscribe_create_websocket_request(is_subscribe=True)
@@ -1921,7 +1947,7 @@ class Exchange(ExchangeApi):
     async def handle_websocket_on_connected(self, *, websocket_connection):
         if websocket_connection.path == self.websocket_market_data_path:
             await self.websocket_market_data_subscribe(websocket_connection=websocket_connection)
-        elif websocket_connection.path == self.websocket_account_path:
+        elif websocket_connection.path in (self.websocket_account_path, self.websocket_account_trade_path):
             await self.websocket_login(websocket_connection=websocket_connection)
 
     async def websocket_on_disconnected(self, *, websocket_connection):
@@ -2253,7 +2279,7 @@ class Exchange(ExchangeApi):
                 is_reduce_only = order_to_update.is_reduce_only
 
                 margin_type = order_to_update.margin_type
-                margin_asset = order_to_update.margin_asset
+                margin_asset = order_to_update.margin_asset or self.margin_asset
 
                 extra_params = order_to_update.extra_params
 

@@ -428,6 +428,8 @@ class WebsocketRequest:
         return self.__dict__
 
 
+one_thousand = 1_000
+one_million = 1_000_000
 one_billion = 1_000_000_000
 
 
@@ -454,6 +456,10 @@ def time_point_subtract(*, time_point_1, time_point_2):
 
 def convert_time_point_to_unix_timestamp_seconds(*, time_point):
     return time_point[0] + time_point[1] / one_billion
+
+
+def convert_time_point_to_unix_timestamp_milliseconds(*, time_point):
+    return time_point[0] * one_thousand + time_point[1] / one_million
 
 
 def convert_time_point_delta_to_seconds(*, time_point_delta):
