@@ -87,7 +87,7 @@ class Bybit(Exchange):
             "PartiallyFilledCanceled": OrderStatus.CANCELED,
             "New": OrderStatus.NEW,
             "PartiallyFilled": OrderStatus.PARTIALLY_FILLED,
-            "filled": OrderStatus.FILLED,
+            "Filled": OrderStatus.FILLED,
             "Untriggered": OrderStatus.UNTRIGGERED,
             "Triggered": OrderStatus.NEW,
             "Rejected": OrderStatus.REJECTED,
@@ -856,8 +856,6 @@ class Bybit(Exchange):
         return json_payload
 
     def convert_dict_to_order(self, *, input, api_method, symbol):
-        pass
-
         if symbol in self.all_instrument_information and self.all_instrument_information[symbol].contract_size_as_decimal:
             self.all_instrument_information[symbol].contract_size_as_decimal
 
@@ -878,7 +876,7 @@ class Bybit(Exchange):
             cumulative_filled_quantity=input["cumExecQty"] or None,
             cumulative_filled_quote_quantity=input["cumExecValue"] or None,
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["createdTime"]),
-            status=self.order_status_mapping.get(input["orderStatus"]),
+            status=self.order_status_mapping[input["orderStatus"]],
         )
 
     def convert_dict_to_fill(self, *, input, api_method, symbol):

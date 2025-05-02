@@ -677,8 +677,8 @@ class Exchange(ExchangeApi):
         # which API method is preferred to create/cancel orders
         trade_api_method_preference: Optional[ApiMethod] = ApiMethod.REST,
         extra_data: Any = None,  # arbitrary user-defined data
-        start_wait_seconds: Optional[int] = 1,  # wait time at start
-        stop_wait_seconds: Optional[int] = 1,  # wait time at stop
+        start_wait_seconds: Optional[float] = 1,  # wait time at start
+        stop_wait_seconds: Optional[float] = 1,  # wait time at stop
         ssl: bool | aiohttp.Fingerprint | ssl.SSLContext = False,  # SSL validation mode. True for default SSL check
         # (ssl.create_default_context() is used), False for skip SSL certificate validation,
         # aiohttp.Fingerprint for fingerprint validation, ssl.SSLContext for custom SSL certificate validation.
@@ -703,7 +703,7 @@ class Exchange(ExchangeApi):
         if logger:
             self.logger = logger
         else:
-            self.logger = Logger(level=LogLevel.ERROR, name=f"{self.name}__{self.instrument_type}")
+            self.logger = Logger(level=LogLevel.WARNING, name=f"{self.name}__{self.instrument_type}")
 
         if not self.is_instrument_type_valid(instrument_type=instrument_type):
             self.logger.critical(Exception(f"invalid instrument_type {instrument_type} for exchange {self.name}"))

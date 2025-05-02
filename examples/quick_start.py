@@ -12,8 +12,8 @@ from crypto_trade.utility import Logger, LogLevel
 
 async def main():
     try:
-        # Default log level is ERROR. Here is how to change it:
-        logger = Logger(level=getattr(LogLevel, os.getenv("LOG_LEVEL", "ERROR")), name="bybit__spot")
+        # Default log level is WARNING. Here is how to change it:
+        logger = Logger(level=getattr(LogLevel, os.getenv("LOG_LEVEL", "WARNING")), name="bybit__spot")
 
         symbol = os.getenv("SYMBOL", "BTCUSDT")
         instrument_type = BybitInstrumentType.SPOT
@@ -27,6 +27,7 @@ async def main():
             api_key=os.getenv("BYBIT_API_KEY", ""),
             api_secret=os.getenv("BYBIT_API_SECRET", ""),
             logger=logger,
+            start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "1")),  # increase this value if connecting through a slow VPN
         )
 
         await exchange.start()
@@ -60,7 +61,7 @@ async def main():
             )
         )
 
-        await asyncio.sleep(int(os.getenv("SLEEP_IN_SECONDS", "1")))
+        await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "0.1")))  # increase this value if connecting through a slow VPN
 
         print("AFTER submitting order\n")
         print("bbos:")
