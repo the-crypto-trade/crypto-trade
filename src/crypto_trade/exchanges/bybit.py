@@ -43,9 +43,9 @@ class Bybit(Exchange):
         super().__init__(name="bybit", **kwargs)
 
         self.rest_market_data_base_url = "https://api.bybit.com"
-        self.rest_account_base_url = self.rest_market_data_base_url
         if self.is_paper_trading:
-            self.rest_account_base_url = "https://api-testnet.bybit.com"
+            self.rest_market_data_base_url = "https://api-testnet.bybit.com"
+        self.rest_account_base_url = self.rest_market_data_base_url
         self.rest_market_data_fetch_all_instrument_information_path = "/v5/market/instruments-info"
         self.rest_market_data_fetch_all_instrument_information_limit = 1000
         self.rest_market_data_fetch_bbo_path = "/v5/market/tickers"
@@ -67,9 +67,9 @@ class Bybit(Exchange):
         self.rest_account_fetch_historical_fill_limit = 100
 
         self.websocket_market_data_base_url = "wss://stream.bybit.com"
-        self.websocket_account_base_url = self.websocket_market_data_base_url
         if self.is_paper_trading:
-            self.websocket_account_base_url = "wss://stream-testnet.bybit.com"
+            self.websocket_market_data_base_url = "wss://stream-testnet.bybit.com"
+        self.websocket_account_base_url = self.websocket_market_data_base_url
         self.websocket_market_data_path = f"/v5/public/{self.instrument_type}"
         self.websocket_market_data_channel_bbo = "orderbook.1."
         self.websocket_market_data_channel_trade = "publicTrade."
@@ -259,7 +259,7 @@ class Bybit(Exchange):
 
     def is_rest_response_for_fetch_order(self, *, rest_response):
         return rest_response.rest_request.path == self.rest_account_fetch_order_path and (
-            " orderId" in self.rest_response.rest_request.query_params or " orderLinkId" in self.rest_response.rest_request.query_params
+            " orderId" in rest_response.rest_request.query_params or " orderLinkId" in rest_response.rest_request.query_params
         )
 
     def is_rest_response_for_fetch_open_order(self, *, rest_response):
@@ -316,7 +316,7 @@ class Bybit(Exchange):
         ]
 
     def convert_rest_response_for_bbo(self, *, json_deserialized_payload, rest_request):
-        exchange_update_time_point = (convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["time"]),)
+        exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["time"])
         return [
             Bbo(
                 api_method=ApiMethod.REST,
@@ -436,7 +436,7 @@ class Bybit(Exchange):
         return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST, symbol=x["symbol"]) for x in json_deserialized_payload["result"]["list"]]
 
     def convert_rest_response_for_fetch_open_order_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
-        cursor = json_deserialized_payload["result"]["nextPagerCursor"]
+        cursor = json_deserialized_payload["result"].get("nextPagerCursor")
 
         if cursor:
             query_params["cursor"] = cursor
@@ -450,7 +450,7 @@ class Bybit(Exchange):
         return [self.convert_dict_to_position(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload["result"]["list"]]
 
     def convert_rest_response_for_fetch_balance(self, *, json_deserialized_payload, rest_request):
-        return [self.convert_dict_to_balance(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload["result"]["list"]]
+        return [self.convert_dict_to_balance(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload["result"]["list"][0]["coin"]]
 
     def convert_rest_response_for_historical_order(self, *, json_deserialized_payload, rest_request):
         symbol = rest_request.query_params["symbol"]
@@ -459,22 +459,26 @@ class Bybit(Exchange):
 
     def convert_rest_response_for_historical_order_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
         data = json_deserialized_payload["result"]["list"]
-        cursor = json_deserialized_payload["result"]["nextPagerCursor"]
-        start_time = rest_request.query_params["startTime"]
-        end_time = rest_request.query_params["endTime"]
+        cursor = json_deserialized_payload["result"].get("nextPagerCursor")
+        start_time = rest_request.query_params.get("startTime")
+        end_time = rest_request.query_params.get("endTime")
 
         if data and cursor:
             query_params = {
                 "category": f"{self.instrument_type}",
                 "symbol": symbol,
-                "startTime": start_time,
-                "endTime": end_time,
                 "cursor": cursor,
                 "limit": self.rest_account_fetch_historical_order_limit,
             }
+            if start_time:
+                query_params["startTime"] = start_time
+            if end_time:
+                query_params["endTime"] = end_time
 
             return self.rest_account_create_get_request_function_with_signature(path=rest_request.path, query_params=query_params)
-        elif self.fetch_historical_order_start_unix_timestamp_seconds is None or start_time > self.fetch_historical_order_start_unix_timestamp_seconds * 1000:
+        elif start_time and (
+            self.fetch_historical_order_start_unix_timestamp_seconds is None or start_time > self.fetch_historical_order_start_unix_timestamp_seconds * 1000
+        ):
             end_time = start_time
             start_time = max(end_time - 7 * 86400 * 1000, (self.fetch_historical_order_start_unix_timestamp_seconds or 0) * 1000)
 
@@ -496,22 +500,26 @@ class Bybit(Exchange):
 
     def convert_rest_response_for_historical_fill_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
         data = json_deserialized_payload["result"]["list"]
-        cursor = json_deserialized_payload["result"]["nextPagerCursor"]
-        start_time = rest_request.query_params["startTime"]
-        end_time = rest_request.query_params["endTime"]
+        cursor = json_deserialized_payload["result"].get("nextPagerCursor")
+        start_time = rest_request.query_params.get("startTime")
+        end_time = rest_request.query_params.get("endTime")
 
         if data and cursor:
             query_params = {
                 "category": f"{self.instrument_type}",
                 "symbol": symbol,
-                "startTime": start_time,
-                "endTime": end_time,
                 "cursor": cursor,
                 "limit": self.rest_account_fetch_historical_fill_limit,
             }
+            if start_time:
+                query_params["startTime"] = start_time
+            if end_time:
+                query_params["endTime"] = end_time
 
             return self.rest_account_create_get_request_function_with_signature(path=rest_request.path, query_params=query_params)
-        elif self.fetch_historical_fill_start_unix_timestamp_seconds is None or start_time > self.fetch_historical_fill_start_unix_timestamp_seconds * 1000:
+        elif start_time and (
+            self.fetch_historical_fill_start_unix_timestamp_seconds is None or start_time > self.fetch_historical_fill_start_unix_timestamp_seconds * 1000
+        ):
             end_time = start_time
             start_time = max(end_time - 7 * 86400 * 1000, (self.fetch_historical_fill_start_unix_timestamp_seconds or 0) * 1000)
 
@@ -563,7 +571,7 @@ class Bybit(Exchange):
 
     def websocket_login_create_websocket_request(self, *, time_point):
         id = self.generate_next_websocket_request_id()
-        expires = convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point) + self.api_receive_window_milliseconds
+        expires = int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point) + self.api_receive_window_milliseconds)
         signature = hmac.new(bytes(self.api_secret, "utf-8"), bytes(f"GET/realtime{expires}", "utf-8"), digestmod=hashlib.sha256).hexdigest()
 
         payload = self.json_serialize(
@@ -573,6 +581,7 @@ class Bybit(Exchange):
                 "args": [self.api_key, expires, signature],
             }
         )
+
         return self.websocket_create_request(payload=payload)
 
     def websocket_market_data_update_subscribe_create_websocket_request(self, *, symbols, is_subscribe):
@@ -694,19 +703,19 @@ class Bybit(Exchange):
 
     def convert_websocket_push_data_for_bbo(self, *, json_deserialized_payload):
         topic = json_deserialized_payload["topic"]
-        symbol = topic[topic.find(".") + 1 :]
+        symbol = topic[topic.rfind(".") + 1 :]
+        data = json_deserialized_payload["data"]
 
         return [
             Bbo(
                 api_method=ApiMethod.WEBSOCKET,
                 symbol=symbol,
                 exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["cts"]),
-                best_bid_price=x["b"][0][0] if x.get("b") else None,
-                best_bid_size=x["b"][0][1] if x.get("b") else None,
-                best_ask_price=x["a"][0][0] if x.get("a") else None,
-                best_ask_size=x["a"][0][1] if x.get("a") else None,
+                best_bid_price=data["b"][0][0] if data.get("b") else None,
+                best_bid_size=data["b"][0][1] if data.get("b") else None,
+                best_ask_price=data["a"][0][0] if data.get("a") else None,
+                best_ask_size=data["a"][0][1] if data.get("a") else None,
             )
-            for x in json_deserialized_payload["data"]
         ]
 
     def convert_websocket_push_data_for_trade(self, *, json_deserialized_payload):
@@ -756,7 +765,7 @@ class Bybit(Exchange):
         return [self.convert_dict_to_position(input=x, api_method=ApiMethod.WEBSOCKET) for x in json_deserialized_payload["data"]]
 
     def convert_websocket_push_data_for_balance(self, *, json_deserialized_payload):
-        return [self.convert_dict_to_balance(input=x, api_method=ApiMethod.WEBSOCKET) for x in json_deserialized_payload["data"]["coin"]]
+        return [self.convert_dict_to_balance(input=x, api_method=ApiMethod.WEBSOCKET) for x in json_deserialized_payload["data"][0]["coin"]]
 
     def convert_websocket_response_for_create_order(self, *, json_deserialized_payload, websocket_request):
         x = json_deserialized_payload["data"]
@@ -819,6 +828,7 @@ class Bybit(Exchange):
             time_in_force = "GTC"
 
         json_payload = {
+            "category": self.instrument_type.value,
             "symbol": order.symbol,
             "orderLinkId": order.client_order_id,
             "side": "Buy" if order.is_buy else "Sell",
@@ -832,6 +842,7 @@ class Bybit(Exchange):
             json_payload["reduceOnly"] = True
         if order.extra_params:
             json_payload.update(order.extra_params)
+
         return json_payload
 
     def account_cancel_order_create_json_payload(self, *, symbol, order_id=None, client_order_id=None):

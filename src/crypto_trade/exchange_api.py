@@ -703,7 +703,8 @@ class Exchange(ExchangeApi):
         if logger:
             self.logger = logger
         else:
-            self.logger = Logger(level=LogLevel.INFO, name=f"{self.name}__{self.instrument_type}")
+            self.logger = Logger(level=LogLevel.ERROR, name=f"{self.name}__{self.instrument_type}")
+
         if not self.is_instrument_type_valid(instrument_type=instrument_type):
             self.logger.critical(Exception(f"invalid instrument_type {instrument_type} for exchange {self.name}"))
 

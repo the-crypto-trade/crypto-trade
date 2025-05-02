@@ -6,51 +6,72 @@ import time
 import traceback
 
 from crypto_trade.exchange_api import Order
-from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
+from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
+from crypto_trade.utility import Logger, LogLevel
 
 
 async def main():
     try:
-        symbol = "BTC-USDT"
-        instrument_type = OkxInstrumentType.SPOT
-        exchange = Okx(
+        # Default log level is ERROR. Here is how to change it:
+        logger = Logger(level=getattr(LogLevel, os.getenv("LOG_LEVEL", "ERROR")), name="bybit__spot")
+
+        symbol = os.getenv("SYMBOL", "BTCUSDT")
+        instrument_type = BybitInstrumentType.SPOT
+        exchange = Bybit(
             instrument_type=instrument_type,
             symbols={symbol},  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
             subscribe_bbo=True,
             subscribe_order=True,
-            is_paper_trading=True,  # https://www.exchange.com/docs-v5/en/#overview-demo-trading-services
-            api_key=os.getenv("OKX_API_KEY", ""),
-            api_secret=os.getenv("OKX_API_SECRET", ""),
-            api_passphrase=os.getenv("OKX_API_PASSPHRASE", ""),
+            subscribe_balance=True,
+            is_paper_trading=True,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
+            api_key=os.getenv("BYBIT_API_KEY", ""),
+            api_secret=os.getenv("BYBIT_API_SECRET", ""),
+            logger=logger,
         )
 
         await exchange.start()
 
+        print("BEFORE submitting order\n")
+        print("bbos:")
         pprint.pp(exchange.bbos)
         print("\n")
-
-        client_order_id = str(int(time.time() * 1000))
+        print("orders:")
+        pprint.pp(exchange.orders)
+        print("\n")
+        print("balances:")
+        pprint.pp(exchange.balances)
+        print("\n")
 
         await exchange.create_order(
             order=Order(
                 symbol=symbol,
-                client_order_id=client_order_id,
-                is_buy=True,
-                price="10000",
-                quantity=exchange.all_instrument_information[symbol].order_quantity_min,
+                client_order_id=str(int(time.time() * 1000)),
+                is_buy=os.getenv("SIDE", "BUY") == "BUY",
+                price=exchange.bbos[symbol].best_ask_price,
+                quantity="0.001",
+                is_market=False,  # omit or set to True for limit order
+                extra_params=(
+                    {
+                        "isLeverage": 1,
+                    }
+                    if os.getenv("IS_LEVERAGE")
+                    else None
+                ),  # extra parameter values to pass through to exchange-specific API
             )
         )
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(int(os.getenv("SLEEP_IN_SECONDS", "1")))
 
+        print("AFTER submitting order\n")
+        print("bbos:")
+        pprint.pp(exchange.bbos)
+        print("\n")
+        print("orders:")
         pprint.pp(exchange.orders)
         print("\n")
-
-        await exchange.cancel_order(symbol=symbol, client_order_id=client_order_id)
-
-        await asyncio.sleep(1)
-
-        pprint.pp(exchange.orders)
+        print("balances:")
+        pprint.pp(exchange.balances)
+        print("\n")
 
         await exchange.stop()
         asyncio.get_running_loop().stop()
