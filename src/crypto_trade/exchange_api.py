@@ -605,6 +605,7 @@ class Balance(BaseModel):
         return Decimal(self.quantity) if self.quantity else None
 
 
+# fmt: off
 class Exchange(ExchangeApi):
 
     def __init__(
@@ -615,8 +616,10 @@ class Exchange(ExchangeApi):
         symbols: str | Iterable[str] = "*",  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
         instrument_type: Optional[str] = None,  # Defaults to spot type. See each derived exchange class for allowed values for that exchange.
         margin_asset: Optional[str] = None,
+
         # bbo
         subscribe_bbo: bool = False,
+
         # trade
         subscribe_trade: bool = False,
         fetch_historical_trade_at_start: bool = False,
@@ -624,6 +627,7 @@ class Exchange(ExchangeApi):
         fetch_historical_trade_end_unix_timestamp_seconds: Optional[int] = None,
         keep_historical_trade_seconds: Optional[int] = 300,  # max historical data time span
         remove_historical_trade_interval_seconds: Optional[int] = 60,  # how often to remove
+
         # ohlcv
         subscribe_ohlcv: bool = False,
         ohlcv_interval_seconds: int = 60,
@@ -633,11 +637,13 @@ class Exchange(ExchangeApi):
         fetch_historical_ohlcv_end_unix_timestamp_seconds: Optional[int] = None,
         keep_historical_ohlcv_seconds: Optional[int] = 300,  # max historical data time span
         remove_historical_ohlcv_interval_seconds: Optional[int] = 60,  # how often to remove
+
         # account
         is_paper_trading: bool = False,
         api_key: str = "",
         api_secret: str = "",
         api_passphrase: str = "",
+
         # order
         subscribe_order: bool = False,
         fetch_historical_order_at_start: bool = False,
@@ -645,6 +651,7 @@ class Exchange(ExchangeApi):
         fetch_historical_order_end_unix_timestamp_seconds: Optional[int] = None,
         keep_historical_order_seconds: Optional[int] = 300,  # max historical data time span
         remove_historical_order_interval_seconds: Optional[int] = 60,  # how often to remove
+
         # fill
         subscribe_fill: bool = False,
         fetch_historical_fill_at_start: bool = False,
@@ -652,10 +659,13 @@ class Exchange(ExchangeApi):
         fetch_historical_fill_end_unix_timestamp_seconds: Optional[int] = None,
         keep_historical_fill_seconds: Optional[int] = 300,  # max historical data time span
         remove_historical_fill_interval_seconds: Optional[int] = 60,  # how often to remove
+
         # position
         subscribe_position: bool = False,
+
         # balance
         subscribe_balance: bool = False,
+
         # settings for using REST API to periodically sync data with the exchange
         rest_market_data_fetch_all_instrument_information_at_start: bool = True,
         rest_market_data_fetch_all_instrument_information_period_seconds: Optional[int] = 300,
@@ -672,6 +682,7 @@ class Exchange(ExchangeApi):
             float
         ] = 0.05,  # only applicable to paginated requests such as fetching historical data
         rest_account_send_consecutive_request_delay_seconds: Optional[float] = 0.05,  # only applicable to paginated requests such as fetching historical data
+
         # settings for using Websocket API to stream realtime data from the exchange
         websocket_connection_protocol_level_heartbeat_period_seconds: Optional[int] = 10,
         websocket_connection_application_level_heartbeat_period_seconds: Optional[int] = 10,
@@ -681,6 +692,7 @@ class Exchange(ExchangeApi):
         websocket_market_data_channel_send_consecutive_request_delay_seconds: Optional[
             float
         ] = 0.05,  # only applicable to divided requests such as subscribing on many symbols
+
         trade_api_method_preference: Optional[ApiMethod] = ApiMethod.REST,  # which API method is preferred to create/cancel orders
         extra_data: Any = None,  # arbitrary user-defined data
         start_wait_seconds: Optional[float] = 1,  # wait time at start
@@ -688,10 +700,12 @@ class Exchange(ExchangeApi):
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
         logger: Optional[LoggerApi] = None,
+
         ssl: bool | aiohttp.Fingerprint | ssl.SSLContext = False,  # SSL validation mode. True for default SSL check
         # (ssl.create_default_context() is used), False for skip SSL certificate validation,
         # aiohttp.Fingerprint for fingerprint validation, ssl.SSLContext for custom SSL certificate validation.
     ) -> None:
+# fmt: on  # noqa
         super().__init__()
 
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
