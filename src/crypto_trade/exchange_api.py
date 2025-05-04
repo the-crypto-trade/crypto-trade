@@ -52,14 +52,21 @@ class MarginType(StrEnum):
 class ExchangeApi:
 
     def __init__(self) -> None:
-        # data obtained from and synced with the exchange
+
         self.all_instrument_information: Dict[Symbol, InstrumentInformation] = {}
+
         self.bbos: Dict[Symbol, Bbo] = {}
+
         self.trades: Dict[Symbol, List[Trade]] = {}  # the list of Trade objects are sorted earliest to latest
+
         self.ohlcvs: Dict[Symbol, List[Ohlcv]] = {}  # the list of Ohlcv objects are sorted earliest to latest
+
         self.orders: Dict[Symbol, List[Order]] = {}  # the list of Order objects are sorted earliest to latest
+
         self.fills: Dict[Symbol, List[Fill]] = {}  # the list of Fill objects are sorted earliest to latest
+
         self.positions: Dict[Symbol, Position] = {}
+
         self.balances: Dict[Symbol, Balance] = {}
 
     async def start(self) -> None:
@@ -674,17 +681,16 @@ class Exchange(ExchangeApi):
         websocket_market_data_channel_send_consecutive_request_delay_seconds: Optional[
             float
         ] = 0.05,  # only applicable to divided requests such as subscribing on many symbols
-        # which API method is preferred to create/cancel orders
-        trade_api_method_preference: Optional[ApiMethod] = ApiMethod.REST,
+        trade_api_method_preference: Optional[ApiMethod] = ApiMethod.REST,  # which API method is preferred to create/cancel orders
         extra_data: Any = None,  # arbitrary user-defined data
         start_wait_seconds: Optional[float] = 1,  # wait time at start
         stop_wait_seconds: Optional[float] = 1,  # wait time at stop
-        ssl: bool | aiohttp.Fingerprint | ssl.SSLContext = False,  # SSL validation mode. True for default SSL check
-        # (ssl.create_default_context() is used), False for skip SSL certificate validation,
-        # aiohttp.Fingerprint for fingerprint validation, ssl.SSLContext for custom SSL certificate validation.
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
         logger: Optional[LoggerApi] = None,
+        ssl: bool | aiohttp.Fingerprint | ssl.SSLContext = False,  # SSL validation mode. True for default SSL check
+        # (ssl.create_default_context() is used), False for skip SSL certificate validation,
+        # aiohttp.Fingerprint for fingerprint validation, ssl.SSLContext for custom SSL certificate validation.
     ) -> None:
         super().__init__()
 
