@@ -27,6 +27,7 @@ from crypto_trade.utility import (
     normalize_decimal_string,
     remove_leading_negative_sign_in_string,
     time_point_now,
+    unix_timestamp_milliseconds_now,
 )
 
 
@@ -78,7 +79,7 @@ class Bybit(Exchange):
         self.websocket_account_channel_order = f"order.{self.instrument_type}"
         self.websocket_account_channel_fill = f"execution.{self.instrument_type}"
         self.websocket_account_channel_position = f"position.{self.instrument_type}"
-        self.websocket_account_channel_balance = f"wallet"
+        self.websocket_account_channel_balance = "wallet"
         self.websocket_account_trade_base_url = self.websocket_account_base_url
         self.websocket_account_trade_path = "/v5/trade"
 
@@ -132,12 +133,13 @@ class Bybit(Exchange):
         headers["X-BAPI-API-KEY"] = self.api_key
         headers["X-BAPI-TIMESTAMP"] = f"{int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}"
         headers["X-BAPI-RECV-WINDOW"] = f"{self.api_receive_window_milliseconds}"
+        payload = rest_request.query_string if rest_request.method == RestRequest.METHOD_GET else rest_request.payload
+
+        signing_string = f"{headers['X-BAPI-TIMESTAMP']}{headers['X-BAPI-API-KEY']}{headers['X-BAPI-RECV-WINDOW']}{payload}"
+
         headers["X-BAPI-SIGN"] = hmac.new(
             bytes(self.api_secret, "utf-8"),
-            bytes(
-                f"{headers['X-BAPI-TIMESTAMP']}{headers['X-BAPI-API-KEY']}{headers['X-BAPI-RECV-WINDOW']}{rest_request.query_string if rest_request.method == RestRequest.METHOD_GET else rest_request.payload}",
-                "utf-8",
-            ),
+            bytes(signing_string, "utf-8"),
             digestmod=hashlib.sha256,
         ).hexdigest()
 
@@ -439,8 +441,7 @@ class Bybit(Exchange):
         cursor = json_deserialized_payload["result"].get("nextPagerCursor")
 
         if cursor:
-            query_params["cursor"] = cursor
-            query_params = {"category": f"{self.instrument_type}", "limit": self.rest_account_fetch_open_order_limit}
+            query_params = {"category": f"{self.instrument_type}", "cursor": cursor, "limit": self.rest_account_fetch_open_order_limit}
             if self.instrument_type == BybitInstrumentType.LINEAR:
                 query_params["settleCoin"] = self.margin_asset
 
@@ -458,6 +459,7 @@ class Bybit(Exchange):
         return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST, symbol=symbol) for x in json_deserialized_payload["result"]["list"]]
 
     def convert_rest_response_for_historical_order_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
+        symbol = rest_request.query_params["symbol"]
         data = json_deserialized_payload["result"]["list"]
         cursor = json_deserialized_payload["result"].get("nextPagerCursor")
         start_time = rest_request.query_params.get("startTime")
@@ -499,6 +501,7 @@ class Bybit(Exchange):
         return [self.convert_dict_to_fill(input=x, api_method=ApiMethod.REST, symbol=symbol) for x in json_deserialized_payload["result"]["list"]]
 
     def convert_rest_response_for_historical_fill_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
+        symbol = rest_request.query_params["symbol"]
         data = json_deserialized_payload["result"]["list"]
         cursor = json_deserialized_payload["result"].get("nextPagerCursor")
         start_time = rest_request.query_params.get("startTime")
@@ -552,7 +555,11 @@ class Bybit(Exchange):
             self.create_task(coro=start_rest_account_fetch_order())
 
         elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
-            if rest_response.status_code == 200 and rest_response.json_deserialized_payload and rest_response.json_deserialized_payload.get("code") in (110001):
+            if (
+                rest_response.status_code == 200
+                and rest_response.json_deserialized_payload
+                and rest_response.json_deserialized_payload.get("code") in (110001,)
+            ):
                 now_time_point = time_point_now()
                 self.replace_order(
                     symbol=rest_response.rest_request.query_params["symbol"],
@@ -904,7 +911,7 @@ class Bybit(Exchange):
             api_method=api_method,
             symbol=input["symbol"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updatedTime"]),
-            quantity=remove_leading_negative_sign_in_string(input=pos),
+            quantity=remove_leading_negative_sign_in_string(input=input["pos"]),
             is_long=input["side"] == "Buy" if input["side"] else None,
             entry_price=input["entryPrice"],
             mark_price=input["markPrice"],

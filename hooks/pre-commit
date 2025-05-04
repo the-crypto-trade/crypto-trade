@@ -3,7 +3,18 @@
 set -e
 set -o pipefail
 
-./format.sh
+VERBOSE=""
+
+# Check for -v flag
+while getopts "v" opt; do
+  case $opt in
+    v)
+      VERBOSE="-v"
+      ;;
+  esac
+done
+
+./format.sh $VERBOSE
 
 format_result=$(git ls-files -m)
 staged_files=$(git diff --name-only --cached)
@@ -23,17 +34,11 @@ else
     exit 1
 fi
 
-./lint.sh
-lint_result=$(./lint.sh)
+./lint.sh $VERBOSE
 
-if [[ "${lint_result}" == "Running lint.sh...
-Running flake8...
-Running mypy...
-Success: no issues found in "*" source files
-Running pylint...
-Done." ]]; then
+if ./lint.sh; then
     echo "Passed lint."
 else
-    echo "Failed lint due to ${lint_result}."
+    echo "Failed lint."
     exit 1
 fi
