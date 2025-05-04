@@ -302,11 +302,7 @@ class Bybit(Exchange):
                         else None
                     )
                 ),
-                order_quantity_max=(
-                    normalize_decimal_string(input=x["lotSizeFilter"]["maxOrderQty"])
-                    if self.instrument_type == BybitInstrumentType.SPOT
-                    else normalize_decimal_string(input=x["lotSizeFilter"]["quotePrecision"])
-                ),
+                order_quantity_max=(normalize_decimal_string(input=x["lotSizeFilter"]["maxOrderQty"])),
                 order_quote_quantity_max=(
                     normalize_decimal_string(input=x["lotSizeFilter"]["maxOrderAmt"]) if self.instrument_type == BybitInstrumentType.SPOT else None
                 ),
@@ -911,14 +907,14 @@ class Bybit(Exchange):
             api_method=api_method,
             symbol=input["symbol"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updatedTime"]),
-            quantity=remove_leading_negative_sign_in_string(input=input["pos"]),
+            quantity=input["size"],
             is_long=input["side"] == "Buy" if input["side"] else None,
-            entry_price=input["entryPrice"],
+            entry_price=input["avgPrice"] if api_method == ApiMethod.REST else input["entryPrice"],
             mark_price=input["markPrice"],
             leverage=input["leverage"],
             initial_margin=input["positionIM"],
             maintenance_margin=input["positionMM"],
-            unrealized_pnl=input["unrealizedPnl"],
+            unrealized_pnl=input["unrealisedPnl"],
             liquidation_price=input["liqPrice"],
         )
 
