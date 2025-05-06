@@ -688,7 +688,7 @@ class Okx(Exchange):
         else:
             self.logger.trace("received application level pong")
 
-    def websocket_on_message_extract_data(self, *, websocket_message):
+    def websocket_on_message_extract_data(self, *, websocket_connection, websocket_message):
         json_deserialized_payload = websocket_message.json_deserialized_payload
 
         websocket_message.payload_summary = {

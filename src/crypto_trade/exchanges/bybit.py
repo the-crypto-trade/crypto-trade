@@ -626,15 +626,25 @@ class Bybit(Exchange):
 
     def websocket_account_create_order_create_websocket_request(self, *, order):
         id = self.generate_next_websocket_request_id()
+        header = {}
+        now_time_point = time_point_now()
+        header["X-BAPI-TIMESTAMP"] = f"{int(convert_time_point_to_unix_timestamp_milliseconds(time_point=now_time_point))}"
+        header["X-BAPI-RECV-WINDOW"] = f"{self.api_receive_window_milliseconds}"
+        header["Referer"] = self.api_broker_id
         arg = self.account_create_order_create_json_payload(order=order)
-        return WebsocketRequest(id=id, json_payload={"reqId": id, "op": "order.create", "args": [arg]}, json_serialize=self.json_serialize)
+        return WebsocketRequest(id=id, json_payload={"reqId": id, "header": header, "op": "order.create", "args": [arg]}, json_serialize=self.json_serialize)
 
     def websocket_account_cancel_order_create_websocket_request(self, *, symbol, order_id=None, client_order_id=None):
         id = self.generate_next_websocket_request_id()
+        header = {}
+        now_time_point = time_point_now()
+        header["X-BAPI-TIMESTAMP"] = f"{int(convert_time_point_to_unix_timestamp_milliseconds(time_point=now_time_point))}"
+        header["X-BAPI-RECV-WINDOW"] = f"{self.api_receive_window_milliseconds}"
+        header["Referer"] = self.api_broker_id
         arg = self.account_cancel_order_create_json_payload(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
-        return WebsocketRequest(id=id, json_payload={"reqId": id, "op": "order.cancel", "args": [arg]}, json_serialize=self.json_serialize)
+        return WebsocketRequest(id=id, json_payload={"reqId": id, "header": header, "op": "order.cancel", "args": [arg]}, json_serialize=self.json_serialize)
 
-    def websocket_on_message_extract_data(self, *, websocket_message):
+    def websocket_on_message_extract_data(self, *, websocket_connection, websocket_message):
         json_deserialized_payload = websocket_message.json_deserialized_payload
 
         websocket_message.payload_summary = {
@@ -644,7 +654,11 @@ class Bybit(Exchange):
             "retCode": json_deserialized_payload.get("retCode"),
         }
 
-        id = json_deserialized_payload.get("req_id")
+        id = (
+            json_deserialized_payload.get("reqId")
+            if websocket_connection.path == self.websocket_account_trade_path
+            else json_deserialized_payload.get("req_id")
+        )
         websocket_message.websocket_request_id = str(id) if id is not None else None
 
         if websocket_message.websocket_request_id:
@@ -788,7 +802,7 @@ class Bybit(Exchange):
         )
 
     def convert_websocket_response_for_cancel_order(self, *, json_deserialized_payload, websocket_request):
-        x = json_deserialized_payload["data"][0]
+        x = json_deserialized_payload["data"]
 
         return Order(
             api_method=ApiMethod.WEBSOCKET,
@@ -798,7 +812,7 @@ class Bybit(Exchange):
             ),
             order_id=x["orderId"],
             client_order_id=websocket_request.json_payload["args"][0].get("orderLinkId"),
-            status=OrderStatus.CREATE_ACKNOWLEDGED,
+            status=OrderStatus.CANCEL_ACKNOWLEDGED,
         )
 
     async def handle_websocket_response_for_error(self, *, websocket_message):
@@ -850,6 +864,7 @@ class Bybit(Exchange):
 
     def account_cancel_order_create_json_payload(self, *, symbol, order_id=None, client_order_id=None):
         json_payload = {
+            "category": self.instrument_type.value,
             "symbol": symbol,
         }
         if order_id:

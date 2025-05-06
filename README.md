@@ -43,6 +43,7 @@
 * Initialize.
 ```
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
+
 exchange = Bybit(
     instrument_type=BybitInstrumentType.SPOT,
     symbols={"BTCUSDT"},  # a comma-separated string or an iterable of strings. Use '*' to represent all symbols that are open for trade.
@@ -57,7 +58,7 @@ await exchange.start()
 ```
 * Commonly used options.
 ```
-instrument_type, symbols, subscribe_bbo, subscribe_trade, subscribe_ohlcv, subscribe_order, subscribe_fill, subscribe_position, subscribe_balance, trade_api_method_preference, marget_asset
+instrument_type, symbols, subscribe_bbo, subscribe_trade, subscribe_ohlcv, subscribe_order, subscribe_fill, subscribe_position, subscribe_balance, trade_api_method_preference, margin_asset
 ```
 * Access synced states at any time.
 ```
@@ -70,7 +71,7 @@ pprint.pp(exchange.balances)
 ```
 bbos, trades, ohlcvs, orders, fills, positions, balances
 ```
-* You can also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
+* You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
 
 ## Examples
 * [Quick start](examples/quick_start.py).

@@ -1828,7 +1828,7 @@ class Exchange(ExchangeApi):
         websocket_message = WebsocketMessage(
             websocket_connection=websocket_connection, payload=raw_websocket_message_data, json_deserialize=self.json_deserialize
         )
-        websocket_message = self.websocket_on_message_extract_data(websocket_message=websocket_message)
+        websocket_message = self.websocket_on_message_extract_data(websocket_connection=websocket_connection, websocket_message=websocket_message)
         websocket_request = None
         if websocket_message.websocket_request_id:
             websocket_request = self.websocket_requests.pop(websocket_message.websocket_request_id, None)
@@ -1977,7 +1977,7 @@ class Exchange(ExchangeApi):
     async def handle_websocket_on_disconnected(self, *, websocket_connection):
         pass
 
-    def websocket_on_message_extract_data(self, *, websocket_message):
+    def websocket_on_message_extract_data(self, *, websocket_connection, websocket_message):
         raise NotImplementedError
 
     def is_websocket_push_data(self, *, websocket_message):
