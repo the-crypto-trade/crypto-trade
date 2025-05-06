@@ -881,8 +881,8 @@ class Okx(Exchange):
             json_payload["px"] = order.price
         if order.is_reduce_only:
             json_payload["reduceOnly"] = True
-        if order.margin_asset:
-            json_payload["ccy"] = order.margin_asset
+        if self.margin_asset or order.margin_asset:
+            json_payload["ccy"] = self.margin_asset or order.margin_asset
         if order.extra_params:
             json_payload.update(order.extra_params)
         return json_payload
