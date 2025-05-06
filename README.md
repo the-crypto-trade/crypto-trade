@@ -40,7 +40,7 @@
     pip install -e '.[dev]'
 
 ## API
-* Initialize.
+* Initialize. Commonly used options: `instrument_type`, `symbols`, `subscribe_bbo`, `subscribe_trade`, `subscribe_ohlcv`, `subscribe_order`, `subscribe_fill`, `subscribe_position`, `subscribe_balance`, `trade_api_method_preference`, `margin_asset`.
 ```
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 
@@ -56,20 +56,12 @@ exchange = Bybit(
 
 await exchange.start()
 ```
-* Commonly used options.
-```
-instrument_type, symbols, subscribe_bbo, subscribe_trade, subscribe_ohlcv, subscribe_order, subscribe_fill, subscribe_position, subscribe_balance, trade_api_method_preference, margin_asset
-```
-* Access synced states at any time.
+* Access synced states at any time. Commonly used states: `bbos`, `trades`, `ohlcvs`, `orders`, `fills`, `positions`, `balances`.
 ```
 import pprint
 pprint.pp(exchange.bbos)
 pprint.pp(exchange.orders)
 pprint.pp(exchange.balances)
-```
-* Commonly used states.
-```
-bbos, trades, ohlcvs, orders, fills, positions, balances
 ```
 * You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
 
