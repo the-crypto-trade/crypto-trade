@@ -23,6 +23,7 @@
   * [Bybit](https://www.bybit.com/invite?ref=XNYP2K).
   * [OKX](https://www.okx.com/join/47636709).
   * More coming soon...
+* [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
 
 ## Branches
 * The `main` branch may contain experimental features.
