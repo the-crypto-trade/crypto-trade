@@ -1,7 +1,16 @@
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**.py"
+      - ".github/workflows/format_lint.yml"
   push:
     branches:
       - main
+    paths:
+      - "**.py"
+      - ".github/workflows/format_lint.yml"
 
 jobs:
   main:
