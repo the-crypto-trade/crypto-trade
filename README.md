@@ -23,7 +23,7 @@
   * [Bybit](https://www.bybit.com/invite?ref=XNYP2K).
   * [OKX](https://www.okx.com/join/47636709).
   * Many more coming soon.
-* [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions) and [sign up for updates](https://sibforms.com/serve/MUIFAL9ivrWSOYW01XIFCAjBydHnMH1nN8LgeHYj54VuVb-TttFX9szkX7ROEWj3uyfkhJX3OK8W22BP1r_LRsIuaBI-c7TUVWkSU1WiYLMJgxehYxXERzv1Gb9pu2XcoaGG2QPGq4vmorm05f7FgezdIXmAzy3D6B00sYh_EZvZ6H-RMFzGizD7TWOrB8fxkUB1QdD2rABQAELd).
+* [sign up for updates](https://sibforms.com/serve/MUIFAL9ivrWSOYW01XIFCAjBydHnMH1nN8LgeHYj54VuVb-TttFX9szkX7ROEWj3uyfkhJX3OK8W22BP1r_LRsIuaBI-c7TUVWkSU1WiYLMJgxehYxXERzv1Gb9pu2XcoaGG2QPGq4vmorm05f7FgezdIXmAzy3D6B00sYh_EZvZ6H-RMFzGizD7TWOrB8fxkUB1QdD2rABQAELd) and [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
 
 
 ## Branches
