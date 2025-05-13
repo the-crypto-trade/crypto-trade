@@ -74,6 +74,7 @@ class Okx(Exchange):
         self.websocket_market_data_base_url = "wss://ws.okx.com:8443"
         if self.is_paper_trading:
             self.websocket_market_data_base_url = "wss://wspap.okx.com:8443"
+        self.websocket_market_data_base_url_2 = self.websocket_market_data_base_url
         self.websocket_account_base_url = self.websocket_market_data_base_url
         self.websocket_market_data_path = "/ws/v5/public"
         self.websocket_market_data_path_2 = "/ws/v5/business"
@@ -567,7 +568,7 @@ class Okx(Exchange):
             if self.subscribe_ohlcv:
                 self.create_task(
                     coro=self.start_websocket_connect(
-                        base_url=self.websocket_market_data_base_url,
+                        base_url=self.websocket_market_data_base_url_2,
                         path=self.websocket_market_data_path_2,
                         query_params=self.websocket_market_data_query_params,
                     )
