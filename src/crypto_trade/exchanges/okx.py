@@ -953,7 +953,7 @@ class Okx(Exchange):
     def convert_dict_to_fill(self, *, input, api_method, symbol):
         fill_fee = input.get("fillFee", input.get("fee"))
         fill_fee_ccy = input.get("fillFeeCcy", input.get("feeCcy"))
-        is_rebate = not fill_fee.startswith("-") if fill_fee else None
+        is_fee_rebate = not fill_fee.startswith("-") if fill_fee else None
 
         return Fill(
             api_method=api_method,
@@ -968,7 +968,7 @@ class Okx(Exchange):
             is_maker=input["execType"] == "M" if input.get("execType") else None,
             fee_asset=fill_fee_ccy,
             fee_quantity=remove_leading_negative_sign_in_string(input=fill_fee) if fill_fee else None,
-            is_rebate=is_rebate,
+            is_fee_rebate=is_fee_rebate,
         )
 
     def convert_dict_to_position(self, *, input, api_method):

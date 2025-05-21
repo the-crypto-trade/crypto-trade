@@ -475,7 +475,7 @@ class Fill(BaseModel):
 
     fee_asset: Optional[str] = None
     fee_quantity: Optional[str] = None
-    is_rebate: Optional[bool] = None
+    is_fee_rebate: Optional[bool] = None
 
     @cached_property
     def trade_id_as_int(self):

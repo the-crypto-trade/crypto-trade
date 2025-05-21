@@ -914,7 +914,7 @@ class Bybit(Exchange):
             is_maker=input["isMaker"],
             fee_asset=input.get("feeCurrency"),
             fee_quantity=remove_leading_negative_sign_in_string(input=exec_fee) if exec_fee else None,
-            is_rebate=exec_fee.startswith("-") if exec_fee else None,
+            is_fee_rebate=exec_fee.startswith("-") if exec_fee else None,
         )
 
     def convert_dict_to_position(self, *, input, api_method):
