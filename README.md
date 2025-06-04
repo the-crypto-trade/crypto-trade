@@ -7,8 +7,8 @@
   - [Installation](#installation)
     - [Install From Github](#install-from-github)
     - [Install Locally](#install-locally)
-  - [API](#api)
   - [Examples](#examples)
+  - [API](#api)
   - [Thread Safety](#thread-safety)
   - [Performance Tuning](#performance-tuning)
 
@@ -41,6 +41,9 @@
 
     pip install -e '.[dev]'
 
+## Examples
+* [Quick start](examples/quick_start.py).
+
 ## API
 * Initialize. Commonly used options: `instrument_type`, `symbols`, `subscribe_bbo`, `subscribe_trade`, `subscribe_ohlcv`, `subscribe_order`, `subscribe_fill`, `subscribe_position`, `subscribe_balance`, `trade_api_method_preference`, `margin_asset`.
 ```
@@ -66,9 +69,6 @@ pprint.pp(exchange.orders)
 pprint.pp(exchange.balances)
 ```
 * You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
-
-## Examples
-* [Quick start](examples/quick_start.py).
 
 ## Thread Safety
 * Single thread.
