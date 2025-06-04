@@ -2,8 +2,8 @@
     "name": "crypto-trade",
     "version": "1.0.0",
     "devDependencies": {
-        "semantic-release": "^24.1.0",
-        "conventional-changelog-conventionalcommits": "^8.0.0"
+        "semantic-release": "^24.2.5",
+        "conventional-changelog-conventionalcommits": "^9.0.0"
     },
     "release": {
         "branches": [
@@ -65,6 +65,10 @@
                         },
                         {
                             "type": "misc",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "*",
                             "release": "patch"
                         }
                     ]
