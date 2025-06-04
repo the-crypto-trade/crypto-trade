@@ -39,7 +39,7 @@
 
 ### Install Locally
 
-    pip install -e '.[dev]'
+    pip install -e ".[dev]"
 
 ## Examples
 * [Quick start](examples/quick_start.py).
