@@ -71,7 +71,7 @@ pprint.pp(exchange.balances)
 * You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
 
 ## Thread Safety
-* Single thread.
+* Single threaded based on Python's asyncio.
 
 ## Performance Tuning
 * [Use a faster json library such as orjson](tests/test_orjson.py).

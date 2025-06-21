@@ -68,7 +68,43 @@
                             "release": "patch"
                         },
                         {
-                            "type": "*",
+                            "type": "security",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "revert",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "infra",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "monitoring",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "logging",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "deps",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "config",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "deploy",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "improve",
+                            "release": "patch"
+                        },
+                        {
+                            "type": "optimize",
                             "release": "patch"
                         }
                     ]
