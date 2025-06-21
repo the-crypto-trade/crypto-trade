@@ -270,26 +270,32 @@ class Okx(Exchange):
         )
 
     def convert_rest_response_for_all_instrument_information(self, *, json_deserialized_payload, rest_request):
-        return [
-            InstrumentInformation(
-                api_method=ApiMethod.REST,
-                symbol=x["instId"],
-                base_asset=x["baseCcy"] if x["baseCcy"] else x["instFamily"].split("-")[0],
-                quote_asset=x["quoteCcy"] if x["quoteCcy"] else x["instFamily"].split("-")[1],
-                order_price_increment=normalize_decimal_string(input=x["tickSz"]),
-                order_quantity_increment=normalize_decimal_string(input=x["lotSz"]),
-                order_quantity_min=normalize_decimal_string(input=x["minSz"]),
-                order_quantity_max=normalize_decimal_string(input=x["maxLmtSz"]),
-                order_quote_quantity_max=normalize_decimal_string(input=x["maxLmtAmt"]),
-                margin_asset=x["settleCcy"],
-                underlying_symbol=x["uly"],
-                contract_size=normalize_decimal_string(input=x["ctVal"]),
-                contract_multiplier=normalize_decimal_string(input=x["ctMult"]),
-                expiry_time=int(expTime) // 1000 if (expTime := x["expTime"]) else None,
-                is_open_for_trade=x["state"] in ("live", "preopen"),
+        result = []
+
+        for x in json_deserialized_payload["data"]:
+            inst_family = x["instFamily"]
+            inst_family_has_dash = "-" in inst_family
+            result.append(
+                InstrumentInformation(
+                    api_method=ApiMethod.REST,
+                    symbol=x["instId"],
+                    base_asset=x["baseCcy"] if x["baseCcy"] else (x["instFamily"].split("-")[0] if inst_family_has_dash else None),
+                    quote_asset=x["quoteCcy"] if x["quoteCcy"] else (x["instFamily"].split("-")[1] if inst_family_has_dash else None),
+                    order_price_increment=normalize_decimal_string(input=x["tickSz"]),
+                    order_quantity_increment=normalize_decimal_string(input=x["lotSz"]),
+                    order_quantity_min=normalize_decimal_string(input=x["minSz"]),
+                    order_quantity_max=normalize_decimal_string(input=x["maxLmtSz"]),
+                    order_quote_quantity_max=normalize_decimal_string(input=x["maxLmtAmt"]),
+                    margin_asset=x["settleCcy"],
+                    underlying_symbol=x["uly"],
+                    contract_size=normalize_decimal_string(input=x["ctVal"]),
+                    contract_multiplier=normalize_decimal_string(input=x["ctMult"]),
+                    expiry_time=int(expTime) // 1000 if (expTime := x["expTime"]) else None,
+                    is_open_for_trade=x["state"] in ("live", "preopen"),
+                )
             )
-            for x in json_deserialized_payload["data"]
-        ]
+
+        return result
 
     def convert_rest_response_for_bbo(self, *, json_deserialized_payload, rest_request):
         return [
