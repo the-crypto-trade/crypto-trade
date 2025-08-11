@@ -3,7 +3,7 @@
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Crypto Trade](#crypto-trade)
-  - [Branches](#branches)
+  - [Branches And Tags](#branches-and-tags)
   - [Installation](#installation)
     - [Install From Github](#install-from-github)
     - [Install Locally](#install-locally)
@@ -26,9 +26,8 @@
 * [Sign up for update](https://sibforms.com/serve/MUIFAL9ivrWSOYW01XIFCAjBydHnMH1nN8LgeHYj54VuVb-TttFX9szkX7ROEWj3uyfkhJX3OK8W22BP1r_LRsIuaBI-c7TUVWkSU1WiYLMJgxehYxXERzv1Gb9pu2XcoaGG2QPGq4vmorm05f7FgezdIXmAzy3D6B00sYh_EZvZ6H-RMFzGizD7TWOrB8fxkUB1QdD2rABQAELd) and [join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
 
 
-## Branches
-* The `main` branch may contain experimental features.
-* The `release` branch represents the most recent stable release.
+## Branches And Tags
+* The `main` branch may contain experimental features. Please use tagged releases for stability.
 
 ## Installation
 * It's recommended that you install in a virtual environment of your choosing.

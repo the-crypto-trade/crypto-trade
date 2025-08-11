@@ -1,17 +1,44 @@
+import argparse
 import asyncio
 import sys
 import traceback
 
+import pytest
+
+from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 from crypto_trade.utility import unix_timestamp_seconds_now
 
+EXCHANGE_CLASSES = {
+    "Bybit": Bybit,
+    "Okx": Okx,
+}
 
-async def main():
+EXCHANGE_INSTRUMENT_TYPES = {
+    "Bybit": BybitInstrumentType,
+    "Okx": OkxInstrumentType,
+}
+
+
+async def main(exchange_name, exchange_instrument_type_name, symbol):
     try:
-        symbol = "BTC-USDT"
+        print(f"main: {exchange_name}, {exchange_instrument_type_name}, {symbol}")
+
+        exchange_class = EXCHANGE_CLASSES.get(exchange_name)
+        if not exchange_class:
+            raise ValueError(f"Exchange class '{exchange_name}' not found")
+
+        enum_class = EXCHANGE_INSTRUMENT_TYPES.get(exchange_name)
+        if not enum_class:
+            raise ValueError(f"Unsupported exchange: {exchange_name}")
+        try:
+            instrument_type_enum = enum_class[exchange_instrument_type_name.upper()]
+        except KeyError:
+            raise ValueError(f"Invalid instrument type '{exchange_instrument_type_name}' for {exchange_name}")
+
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
-        exchange = Okx(
-            instrument_type=OkxInstrumentType.SPOT,
+        exchange = exchange_class(
+            instrument_type=instrument_type_enum,
             symbols={symbol},
             subscribe_bbo=True,
             subscribe_trade=True,
@@ -45,12 +72,30 @@ async def main():
         sys.exit("exit")
 
 
-def test_start_stop():
+@pytest.mark.parametrize(
+    "exchange, exchange_instrument_type, symbol",
+    [
+        ("Okx", "SPOT", "BTC-USDT"),
+        ("Okx", "MARGIN", "BTC-USDT"),
+        ("Okx", "SWAP", "BTC-USDT-SWAP"),
+        ("Bybit", "SPOT", "BTCUSDT"),
+        ("Bybit", "LINEAR", "BTCUSDT"),
+        ("Bybit", "INVERSE", "BTCUSD"),
+    ],
+)
+def test_start_stop(exchange, exchange_instrument_type, symbol):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.create_task(main())
+    loop.create_task(main(exchange, exchange_instrument_type, symbol))
     loop.run_forever()
 
 
 if __name__ == "__main__":
-    test_start_stop()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exchange", required=True)
+    parser.add_argument("--exchange_instrument_type", required=True)
+    parser.add_argument("--symbol", required=True)
+
+    args = parser.parse_args()
+
+    test_start_stop(args.exchange, args.exchange_instrument_type, args.symbol)
