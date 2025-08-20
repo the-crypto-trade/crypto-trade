@@ -37,10 +37,7 @@ async def main():
 
 
 def test_start_stop():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

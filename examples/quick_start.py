@@ -22,7 +22,7 @@ async def main():
             subscribe_bbo=True,
             subscribe_order=True,
             subscribe_balance=True,
-            is_paper_trading=True,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
+            is_paper_trading=False,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
             api_key=os.getenv("BYBIT_API_KEY", ""),
             api_secret=os.getenv("BYBIT_API_SECRET", ""),
             logger=logger,
@@ -82,7 +82,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())

@@ -36,20 +36,6 @@ jobs:
           pip install --upgrade pip
           pip install .
 
-      # - name: Run examples
-      #   if: runner.os != 'Windows'
-      #   env:
-      #     CRYPTO_TRADE_EXIT_ON_ERROR: "true"
-      #   run: |
-      #     for file in $(find examples -name '*.py');
-      #     do
-      #         echo "Running ${file}..."
-      #         if ! python3 $file; then
-      #             echo "Failed ${file}."
-      #             exit 1
-      #         fi
-      #     done
-
       - name: Install dev dependencies
         run: |
           pip install ".[dev]"
