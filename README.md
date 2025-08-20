@@ -24,6 +24,7 @@
   * [OKX](https://www.okx.com/join/47636709).
   * Many more coming soon.
 * [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
+* Contact info: cryptotrade606@gmail.com.
 
 
 ## Branches And Tags
