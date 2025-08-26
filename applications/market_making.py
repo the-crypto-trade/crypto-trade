@@ -36,8 +36,11 @@ def parse_base_assets(s):
             weights[asset] = None
         elif len(parts) == 2:  # asset with weight
             asset, w = parts
+            w = float(w)
+            if w <= 0:
+                raise argparse.ArgumentTypeError(f"Invalid weight for asset '{asset}': {w}. Must be positive.")
             assets.append(asset)
-            weights[asset] = float(w)
+            weights[asset] = w
             has_weights = True
         else:
             raise argparse.ArgumentTypeError(f"Invalid base asset format: '{item}'. Use 'ASSET' or 'ASSET:WEIGHT'.")
@@ -242,6 +245,7 @@ async def main():
         asyncio.create_task(track_price_changes())
         asyncio.create_task(calculate_statistics())
 
+        await asyncio.sleep(1)
         # --- Main trading loop ---
         while True:
             total_value = 0
@@ -256,6 +260,9 @@ async def main():
 
             quote_asset_quantity = exchange.balances[quote_asset].quantity_as_float if quote_asset in exchange.balances else 0
             total_value += quote_asset_quantity
+
+            if total_value <= 0:
+                raise ValueError(f"Computed total_value must be positive, got {total_value}")
 
             logger.detail(f"total_value = {total_value}")
 
@@ -282,64 +289,81 @@ async def main():
                     bbo = exchange.bbos[symbol]
                     logger.detail(f"[{symbol}] bbo.best_bid_price = {bbo.best_bid_price}, bbo.best_ask_price = {bbo.best_ask_price}")
 
-                    base_ratio_denom = total_value * base_asset_weights[symbol_to_base_asset[symbol]]
-                    if base_ratio_denom > 0:
-                        price = bbo.mid_price_as_float
-                        base_asset = symbol_to_base_asset[symbol]
-                        base_asset_quantity = exchange.balances[base_asset].quantity_as_float if base_asset in exchange.balances else 0
-                        base_asset_value = price * base_asset_quantity
-                        quote_asset_quantity = exchange.balances[quote_asset].quantity_as_float if quote_asset in exchange.balances else 0
-                        logger.detail(
-                            f"[{symbol}] base_asset_quantity = {base_asset_quantity}, base_asset_value = {base_asset_value}, quote_asset_quantity = {quote_asset_quantity}"
+                    price = bbo.mid_price_as_float
+                    base_asset = symbol_to_base_asset[symbol]
+                    base_asset_quantity = exchange.balances[base_asset].quantity_as_float if base_asset in exchange.balances else 0
+                    base_asset_value = price * base_asset_quantity
+                    quote_asset_quantity = exchange.balances[quote_asset].quantity_as_float if quote_asset in exchange.balances else 0
+                    logger.detail(
+                        f"[{symbol}] base_asset_quantity = {base_asset_quantity}, base_asset_value = {base_asset_value}, quote_asset_quantity = {quote_asset_quantity}"
+                    )
+
+                    available_quote_asset_quantity = quote_asset_quantity
+                    for orders_for_a_symbol in exchange.orders.values():
+                        for order in orders_for_a_symbol:
+                            if not order.is_closed and order.is_buy:
+                                available_quote_asset_quantity -= order.price_as_float * order.quantity_as_float
+                    logger.detail(f"[{symbol}] available_quote_asset_quantity = {available_quote_asset_quantity}")
+
+                    target_base_asset_value = total_value * base_asset_weights[symbol_to_base_asset[symbol]] * 0.5
+                    base_ratio = (base_asset_value - target_base_asset_value) / target_base_asset_value
+                    order_prices_as_decimal = {True: set(), False: set()}
+
+                    for i in range(max_num_open_orders_per_symbol_per_side):
+                        volatility_multiplier = (max_volatility_multiplier - min_volatility_multiplier) / (
+                            max_num_open_orders_per_symbol_per_side - 1
+                        ) * i + min_volatility_multiplier
+
+                        # Buy price
+                        buy_volatility_multiplier = max(
+                            (
+                                volatility_multiplier + base_ratio * (max_volatility_multiplier - volatility_multiplier)
+                                if base_ratio >= 0
+                                else volatility_multiplier + base_ratio * (volatility_multiplier - min_volatility_multiplier)
+                            ),
+                            0,
+                        )
+                        buy_price = round_to_nearest(
+                            input=bbo.best_bid_price_as_float * (1 - buy_volatility_multiplier * volatility), increment=info.order_price_increment
+                        )
+                        order_prices_as_decimal[True].add(buy_price)
+
+                        # Sell price
+                        sell_volatility_multiplier = max(
+                            (
+                                volatility_multiplier - base_ratio * (volatility_multiplier - min_volatility_multiplier)
+                                if base_ratio >= 0
+                                else volatility_multiplier - base_ratio * (max_volatility_multiplier - volatility_multiplier)
+                            ),
+                            0,
+                        )
+                        sell_price = round_to_nearest(
+                            input=bbo.best_ask_price_as_float * (1 + sell_volatility_multiplier * volatility), increment=info.order_price_increment
+                        )
+                        order_prices_as_decimal[False].add(sell_price)
+
+                    # Create buy orders
+                    if order_prices_as_decimal[True]:
+                        estimated_buy_quote_qty = min(
+                            total_value * base_asset_weights[symbol_to_base_asset[symbol]] - base_asset_value, available_quote_asset_quantity
+                        ) / len(order_prices_as_decimal[True])
+                        await create_orders(
+                            symbol,
+                            True,
+                            order_prices_as_decimal[True],
+                            None,
+                            estimated_buy_quote_qty,
+                            info.order_quantity_min_as_float,
+                            order_quote_min,
+                            info,
                         )
 
-                        available_quote_asset_quantity = quote_asset_quantity
-                        for orders_for_a_symbol in exchange.orders.values():
-                            for order in orders_for_a_symbol:
-                                if not order.is_closed and order.is_buy:
-                                    available_quote_asset_quantity -= order.price_as_float * order.quantity_as_float
-                        logger.detail(f"[{symbol}] available_quote_asset_quantity = {available_quote_asset_quantity}")
-
-                        base_ratio = base_asset_value / base_ratio_denom
-                        order_prices_as_decimal = {True: set(), False: set()}
-
-                        for i in range(max_num_open_orders_per_symbol_per_side):
-                            vm = (max_volatility_multiplier - min_volatility_multiplier) / (
-                                max_num_open_orders_per_symbol_per_side - 1
-                            ) * i + min_volatility_multiplier
-
-                            # Buy price
-                            buy_vm = max(vm + base_ratio * (max_volatility_multiplier - vm), 0)
-                            buy_price = round_to_nearest(input=bbo.best_bid_price_as_float * (1 - buy_vm * volatility), increment=info.order_price_increment)
-                            order_prices_as_decimal[True].add(buy_price)
-
-                            # Sell price
-                            sell_vm = max(vm + (1 - base_ratio) * (max_volatility_multiplier - vm), 0)
-                            sell_price = round_to_nearest(input=bbo.best_ask_price_as_float * (1 + sell_vm * volatility), increment=info.order_price_increment)
-                            order_prices_as_decimal[False].add(sell_price)
-
-                        # Create buy orders
-                        if order_prices_as_decimal[True]:
-                            estimated_buy_quote_qty = min(
-                                total_value * base_asset_weights[symbol_to_base_asset[symbol]] - base_asset_value, available_quote_asset_quantity
-                            ) / len(order_prices_as_decimal[True])
-                            await create_orders(
-                                symbol,
-                                True,
-                                order_prices_as_decimal[True],
-                                None,
-                                estimated_buy_quote_qty,
-                                info.order_quantity_min_as_float,
-                                order_quote_min,
-                                info,
-                            )
-
-                        # Create sell orders
-                        if order_prices_as_decimal[False]:
-                            estimated_sell_qty = base_asset_quantity / len(order_prices_as_decimal[False])
-                            await create_orders(
-                                symbol, False, order_prices_as_decimal[False], estimated_sell_qty, None, info.order_quantity_min_as_float, order_quote_min, info
-                            )
+                    # Create sell orders
+                    if order_prices_as_decimal[False]:
+                        estimated_sell_qty = base_asset_quantity / len(order_prices_as_decimal[False])
+                        await create_orders(
+                            symbol, False, order_prices_as_decimal[False], estimated_sell_qty, None, info.order_quantity_min_as_float, order_quote_min, info
+                        )
                 sleep_time_in_seconds = refresh_interval_seconds / len(symbols)
                 logger.detail(f"about to sleep for {sleep_time_in_seconds} seconds")
                 await asyncio.sleep(sleep_time_in_seconds)
