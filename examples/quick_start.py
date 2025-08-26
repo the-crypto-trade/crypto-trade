@@ -5,7 +5,7 @@ import sys
 import time
 import traceback
 
-from crypto_trade.exchange_api import Order
+from crypto_trade.exchange_api import ApiMethod, Order
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.utility import Logger, LogLevel
 
@@ -27,6 +27,7 @@ async def main():
             api_secret=os.getenv("BYBIT_API_SECRET", ""),
             logger=logger,
             start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "1")),  # increase this value if connecting through a slow VPN
+            trade_api_method_preference=ApiMethod.REST,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
         )
 
         await exchange.start()
