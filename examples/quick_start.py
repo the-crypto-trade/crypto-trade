@@ -5,7 +5,7 @@ import sys
 import time
 import traceback
 
-from crypto_trade.exchange_api import Order
+from crypto_trade.exchange_api import ApiMethod, Order
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.utility import Logger, LogLevel
 
@@ -22,11 +22,12 @@ async def main():
             subscribe_bbo=True,
             subscribe_order=True,
             subscribe_balance=True,
-            is_paper_trading=True,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
+            is_paper_trading=False,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
             api_key=os.getenv("BYBIT_API_KEY", ""),
             api_secret=os.getenv("BYBIT_API_SECRET", ""),
             logger=logger,
             start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "1")),  # increase this value if connecting through a slow VPN
+            trade_api_method_preference=ApiMethod.REST,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
         )
 
         await exchange.start()
@@ -82,7 +83,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())

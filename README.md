@@ -9,8 +9,11 @@
     - [Install Locally](#install-locally)
   - [Examples](#examples)
   - [API](#api)
+  - [Paper Trading](#paper-trading)
   - [Thread Safety](#thread-safety)
   - [Performance Tuning](#performance-tuning)
+  - [Applications](#applications)
+    - [Spot Market Making](#spot-market-making)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -21,8 +24,9 @@
 * Super simple to use. Your code will be in a linear and synchronous manner. The library takes care of asynchronous networking.
 * Supported exchanges:
   * [Bybit](https://www.bybit.com/invite?ref=XNYP2K).
-  * [OKX](https://www.okx.com/join/47636709).
+  * [Okx](https://www.okx.com/join/47636709).
   * Many more coming soon.
+* A spot market making application is provided as an end-to-end solution for liquidity providers.
 * [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
 * Contact info: cryptotrade606@gmail.com.
 
@@ -55,6 +59,7 @@ exchange = Bybit(
     subscribe_bbo=True,
     subscribe_order=True,
     subscribe_balance=True,
+    is_paper_trading=False,
     api_key=...,
     api_secret=...,
 )
@@ -70,9 +75,21 @@ pprint.pp(exchange.balances)
 ```
 * You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
 
+## Paper Trading
+* When `is_paper_trading` is set to `True`, trading will be performed in a testing environment. See below for details.
+* For [Bybit](https://www.bybit.com/invite?ref=XNYP2K), its testnet environment will be used: https://testnet.bybit.com.
+* For [Okx](https://www.okx.com/join/47636709), its demo trading environment will be used: https://www.okx.com/en-us/help/how-to-use-demo-trading.
+
 ## Thread Safety
 * Single threaded based on Python's asyncio.
 
 ## Performance Tuning
 * [Use a faster json library such as orjson](tests/test_orjson.py).
 * [Use a faster event loop such as uvloop](tests/test_uvloop.py).
+
+## Applications
+
+### Spot Market Making
+* Source code: [applications/market_making.py](applications/market_making.py)
+* Configuration: see the beginning of the source code for environment variables and command line arguments.
+* Quick start: `env PYTHONPATH=src API_KEY=... API_SECRET=... python3 applications/market_making.py --exchange-name bybit --base-assets BTC --quote-asset USDT`

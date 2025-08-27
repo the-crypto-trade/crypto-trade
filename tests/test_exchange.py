@@ -50,10 +50,7 @@ async def main(instrument):
 
 @pytest.mark.parametrize("instrument", all_instruments)
 def test_start_stop(instrument):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main(instrument))
-    loop.run_forever()
+    asyncio.run(main(instrument))
 
 
 if __name__ == "__main__":

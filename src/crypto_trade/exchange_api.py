@@ -685,6 +685,7 @@ class Exchange(ExchangeApi):
         extra_data: Any = None,  # arbitrary user-defined data
         start_wait_seconds: Optional[float] = 1,  # wait time at start
         stop_wait_seconds: Optional[float] = 1,  # wait time at stop
+        send_consecutive_cancel_order_request_delay_seconds: Optional[float] = 0.05,  # due to rate limit
         json_serialize: Optional[Callable[[Any], str]] = None,  # function to serialize json
         json_deserialize: Optional[Callable[[str], Any]] = None,  # function to deserialize json
         logger: Optional[LoggerApi] = None,
@@ -793,6 +794,7 @@ class Exchange(ExchangeApi):
         self.extra_data = extra_data
         self.start_wait_seconds = start_wait_seconds
         self.stop_wait_seconds = stop_wait_seconds
+        self.send_consecutive_cancel_order_request_delay_seconds = send_consecutive_cancel_order_request_delay_seconds
 
         self.client_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl))
 
@@ -1163,6 +1165,7 @@ class Exchange(ExchangeApi):
                             trade_api_method_preference=trade_api_method_preference,
                             local_update_time_point=local_update_time_point,
                         )
+                        await asyncio.sleep(self.send_consecutive_cancel_order_request_delay_seconds)
         else:
             for symbol, orders_for_symbol in self.orders.items():
                 for order in orders_for_symbol:
@@ -1176,6 +1179,7 @@ class Exchange(ExchangeApi):
                             trade_api_method_preference=trade_api_method_preference,
                             local_update_time_point=local_update_time_point,
                         )
+                        await asyncio.sleep(self.send_consecutive_cancel_order_request_delay_seconds)
 
     def cancel_orders_filter_order(self, *, order, order_ids=None, client_order_ids=None, margin_asset=None):
         return (

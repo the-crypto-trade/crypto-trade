@@ -84,10 +84,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
     ],
 )
 def test_start_stop(exchange, exchange_instrument_type, symbol):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main(exchange, exchange_instrument_type, symbol))
-    loop.run_forever()
+    asyncio.run(main(exchange, exchange_instrument_type, symbol))
 
 
 if __name__ == "__main__":
