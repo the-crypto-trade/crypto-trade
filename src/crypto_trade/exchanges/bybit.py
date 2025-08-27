@@ -570,7 +570,7 @@ class Bybit(Exchange):
         id = self.generate_next_websocket_request_id()
         payload = self.json_serialize({"req_id": id, "op": "ping"})
         self.logger.trace("send application level ping")
-        return self.websocket_create_request(payload=payload)
+        return self.websocket_create_request(id=id, payload=payload)
 
     def websocket_login_create_websocket_request(self, *, time_point):
         id = self.generate_next_websocket_request_id()
@@ -585,7 +585,7 @@ class Bybit(Exchange):
             }
         )
 
-        return self.websocket_create_request(payload=payload)
+        return self.websocket_create_request(id=id, payload=payload)
 
     def websocket_market_data_update_subscribe_create_websocket_request(self, *, symbols, is_subscribe):
         if self.subscribe_bbo or self.subscribe_trade or self.subscribe_ohlcv:
@@ -601,7 +601,7 @@ class Bybit(Exchange):
 
             id = self.generate_next_websocket_request_id()
             payload = self.json_serialize({"req_id": id, "op": "subscribe", "args": args})
-            return self.websocket_create_request(payload=payload)
+            return self.websocket_create_request(id=id, payload=payload)
         else:
             return None
 
@@ -622,7 +622,7 @@ class Bybit(Exchange):
 
         id = self.generate_next_websocket_request_id()
         payload = self.json_serialize({"req_id": id, "op": "subscribe", "args": args})
-        return self.websocket_create_request(payload=payload)
+        return self.websocket_create_request(id=id, payload=payload)
 
     def websocket_account_create_order_create_websocket_request(self, *, order):
         id = self.generate_next_websocket_request_id()
@@ -696,7 +696,7 @@ class Bybit(Exchange):
 
     def is_websocket_response_success(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
-        return payload_summary["success"] or (payload_summary["retCode"] is not None and payload_summary["retCode"] == 0)
+        return payload_summary["success"] or (payload_summary["retCode"] is not None and payload_summary["retCode"] == 0) or payload_summary["op"] == "pong"
 
     def is_websocket_response_for_create_order(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
