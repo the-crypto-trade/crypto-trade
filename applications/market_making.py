@@ -85,13 +85,13 @@ async def main():
             "--min-volatility-multiplier",
             type=float,
             default=0.5,
-            help="Minimum volatility multiplier. Can be any non-negative number. Used to calculate quote price levels.",
+            help="Minimum volatility multiplier. Can be any non-negative number. Used to calculate and control quote price levels. Smaller value results in prices closer to the mid price.",  # noqa: E501
         )
         parser.add_argument(
             "--max-volatility-multiplier",
             type=float,
             default=1.5,
-            help="Maximum volatility multiplier. Can be any non-negative number. Used to calculate quote price levels.",
+            help="Maximum volatility multiplier. Can be any non-negative number. Used to calculate and control quote price levels. Smaller value results in prices closer to the mid price.",  # noqa: E501
         )
         parser.add_argument("--max-num-open-orders-per-symbol-per-side", type=int, default=4, help="Max open orders per symbol per side.")
         parser.add_argument(

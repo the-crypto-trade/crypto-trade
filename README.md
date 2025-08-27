@@ -12,6 +12,8 @@
   - [Paper Trading](#paper-trading)
   - [Thread Safety](#thread-safety)
   - [Performance Tuning](#performance-tuning)
+  - [Applications](#applications)
+    - [Spot Market Making](#spot-market-making)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -24,6 +26,7 @@
   * [Bybit](https://www.bybit.com/invite?ref=XNYP2K).
   * [Okx](https://www.okx.com/join/47636709).
   * Many more coming soon.
+* A spot market making application is provided as an end-to-end solution for liquidity providers.
 * [Join the discussion](https://github.com/the-crypto-trade/crypto-trade/discussions).
 * Contact info: cryptotrade606@gmail.com.
 
@@ -83,3 +86,9 @@ pprint.pp(exchange.balances)
 ## Performance Tuning
 * [Use a faster json library such as orjson](tests/test_orjson.py).
 * [Use a faster event loop such as uvloop](tests/test_uvloop.py).
+
+## Applications
+
+### Spot Market Making
+* Source code: [applications/market_making.py](applications/market_making.py)
+* Configuration: see the beginning of the source code for environment variables and command line arguments.
