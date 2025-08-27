@@ -305,7 +305,7 @@ async def main():
                     base_asset_value = price * base_asset_quantity
                     quote_asset_quantity = exchange.balances[quote_asset].quantity_as_float if quote_asset in exchange.balances else 0
                     logger.info(
-                        f"[{symbol}] base_asset_quantity = {base_asset_quantity}, base_asset_value = {base_asset_value}, quote_asset_quantity = {quote_asset_quantity}"
+                        f"[{symbol}] base_asset_quantity = {base_asset_quantity}, base_asset_value = {base_asset_value}, quote_asset_quantity = {quote_asset_quantity}"  # noqa: E501
                     )
 
                     available_quote_asset_quantity = quote_asset_quantity

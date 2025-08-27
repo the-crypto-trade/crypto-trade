@@ -50,7 +50,7 @@ async def main(instrument):
 
 @pytest.mark.parametrize("instrument", all_instruments)
 def test_start_stop(instrument):
-    asyncio.run(main())
+    asyncio.run(main(instrument))
 
 
 if __name__ == "__main__":

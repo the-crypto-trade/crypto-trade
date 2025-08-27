@@ -35,7 +35,7 @@ async def main():
 
 
 def test_start_stop():
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())  # pylint: disable=possibly-used-before-assignment
     asyncio.run(main())
 
 

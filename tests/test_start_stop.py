@@ -84,7 +84,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
     ],
 )
 def test_start_stop(exchange, exchange_instrument_type, symbol):
-    asyncio.run(main())
+    asyncio.run(main(exchange, exchange_instrument_type, symbol))
 
 
 if __name__ == "__main__":
