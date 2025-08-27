@@ -81,8 +81,18 @@ async def main():
             "--price-change-look-back-seconds", type=int, default=18000, help="Seconds to look back for price changes. Used to calculate market statistics."
         )
         parser.add_argument("--refresh-interval-seconds", type=float, default=30, help="Interval between order refreshes.")
-        parser.add_argument("--min-volatility-multiplier", type=float, default=0.5, help="Minimum volatility multiplier. Used to calculate quote price levels.")
-        parser.add_argument("--max-volatility-multiplier", type=float, default=2.0, help="Maximum volatility multiplier. Used to calculate quote price levels.")
+        parser.add_argument(
+            "--min-volatility-multiplier",
+            type=float,
+            default=0.5,
+            help="Minimum volatility multiplier. Can be any non-negative number. Used to calculate quote price levels.",
+        )
+        parser.add_argument(
+            "--max-volatility-multiplier",
+            type=float,
+            default=1.5,
+            help="Maximum volatility multiplier. Can be any non-negative number. Used to calculate quote price levels.",
+        )
         parser.add_argument("--max-num-open-orders-per-symbol-per-side", type=int, default=4, help="Max open orders per symbol per side.")
         parser.add_argument(
             "--start-wait-seconds", type=float, default=1, help="Initial delay before trading. Increase this value if connecting through a slow VPN."
@@ -92,7 +102,7 @@ async def main():
         parser.add_argument(
             "--log-level",
             type=str.lower,
-            default="warning",
+            default="info",
             choices=["trace", "debug", "fine", "detail", "info", "warning", "error", "critical", "none"],
             help="Logging level.",
         )
@@ -205,7 +215,7 @@ async def main():
                     order_quantity_str = convert_decimal_to_string(input=order_quantity_as_decimal)
                     order = Order(symbol=symbol, is_buy=is_buy, price=order_price_str, quantity=order_quantity_str, is_post_only=True)
                     side_text = "buy" if is_buy else "sell"
-                    logger.detail(f"[{symbol}] create {side_text} order with price {order_price_str} and quantity {order_quantity_str}")
+                    logger.info(f"[{symbol}] create {side_text} order with price {order_price_str} and quantity {order_quantity_str}")
                     await exchange.create_order(order=order)
                     await asyncio.sleep(send_consecutive_create_order_request_delay_seconds)
 
@@ -264,7 +274,7 @@ async def main():
             if total_value <= 0:
                 raise ValueError(f"Computed total_value must be positive, got {total_value}")
 
-            logger.detail(f"total_value = {total_value}")
+            logger.info(f"total_value = {total_value}")
 
             first_time_symbols = symbols.copy()
 
@@ -279,22 +289,22 @@ async def main():
                     and exchange.bbos[symbol].best_ask_price
                 ):
                     first_time_symbols.remove(symbol)
-                    logger.detail(f"[{symbol}] cancel orders")
+                    logger.info(f"[{symbol}] cancel orders")
                     await exchange.cancel_orders(symbol=symbol)
 
                     info = exchange.all_instrument_information[symbol]
                     order_quote_min = info.order_quote_quantity_min_as_float or 0
                     volatility = exchange.volatilities[symbol] * math.sqrt(refresh_interval_seconds)
-                    logger.detail(f"[{symbol}] volatility = {volatility}")
+                    logger.info(f"[{symbol}] volatility = {volatility}")
                     bbo = exchange.bbos[symbol]
-                    logger.detail(f"[{symbol}] bbo.best_bid_price = {bbo.best_bid_price}, bbo.best_ask_price = {bbo.best_ask_price}")
+                    logger.info(f"[{symbol}] bbo.best_bid_price = {bbo.best_bid_price}, bbo.best_ask_price = {bbo.best_ask_price}")
 
                     price = bbo.mid_price_as_float
                     base_asset = symbol_to_base_asset[symbol]
                     base_asset_quantity = exchange.balances[base_asset].quantity_as_float if base_asset in exchange.balances else 0
                     base_asset_value = price * base_asset_quantity
                     quote_asset_quantity = exchange.balances[quote_asset].quantity_as_float if quote_asset in exchange.balances else 0
-                    logger.detail(
+                    logger.info(
                         f"[{symbol}] base_asset_quantity = {base_asset_quantity}, base_asset_value = {base_asset_value}, quote_asset_quantity = {quote_asset_quantity}"
                     )
 
@@ -303,7 +313,7 @@ async def main():
                         for order in orders_for_a_symbol:
                             if not order.is_closed and order.is_buy:
                                 available_quote_asset_quantity -= order.price_as_float * order.quantity_as_float
-                    logger.detail(f"[{symbol}] available_quote_asset_quantity = {available_quote_asset_quantity}")
+                    logger.info(f"[{symbol}] available_quote_asset_quantity = {available_quote_asset_quantity}")
 
                     target_base_asset_value = total_value * base_asset_weights[symbol_to_base_asset[symbol]] * 0.5
                     base_ratio = (base_asset_value - target_base_asset_value) / target_base_asset_value
@@ -365,7 +375,7 @@ async def main():
                             symbol, False, order_prices_as_decimal[False], estimated_sell_qty, None, info.order_quantity_min_as_float, order_quote_min, info
                         )
                 sleep_time_in_seconds = refresh_interval_seconds / len(symbols)
-                logger.detail(f"about to sleep for {sleep_time_in_seconds} seconds")
+                logger.info(f"about to sleep for {sleep_time_in_seconds} seconds")
                 await asyncio.sleep(sleep_time_in_seconds)
 
     except Exception:
