@@ -29,8 +29,6 @@ async def main():
 
         await exchange.stop()
 
-        asyncio.get_running_loop().stop()
-
     except Exception:
         print(traceback.format_exc())
         sys.exit("exit")
