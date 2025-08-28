@@ -75,7 +75,6 @@ async def main():
         print("\n")
 
         await exchange.stop()
-        asyncio.get_running_loop().stop()
 
     except Exception:
         print(traceback.format_exc())

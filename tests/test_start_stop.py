@@ -65,8 +65,6 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
 
         await exchange.stop()
 
-        asyncio.get_running_loop().stop()
-
     except Exception:
         print(traceback.format_exc())
         sys.exit("exit")
