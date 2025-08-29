@@ -34,7 +34,7 @@ async def main():
         await exchange.stop()
 
         if symbol in exchange.ohlcvs:
-            with open(os.getenv("SAVE_DATA_FILE_PATH", f"data.csv"), "w", newline="") as f:
+            with open(os.getenv("SAVE_DATA_FILE_PATH", "data.csv"), "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["datetime", "open", "high", "low", "close", "volume", "quote_volume"])
                 for ohlcv in exchange.ohlcvs[symbol]:
