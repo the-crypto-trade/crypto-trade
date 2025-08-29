@@ -913,7 +913,7 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_rest_market_data_fetch_bbo())
 
-        if self.subscribe_order or self.rest_account_fetch_open_order_at_start or self.rest_account_cancel_open_order_at_start:
+        if (self.subscribe_order or self.rest_account_fetch_open_order_at_start or self.rest_account_cancel_open_order_at_start) and self.api_key:
             await self.rest_account_fetch_open_order()
             if self.rest_account_cancel_open_order_at_start:
                 await self.cancel_orders(trade_api_method_preference=ApiMethod.REST)
@@ -942,10 +942,10 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_rest_account_check_in_flight_order())
 
-        if self.subscribe_position or self.rest_account_fetch_position_period_seconds:
+        if (self.subscribe_position or self.rest_account_fetch_position_period_seconds) and self.api_key:
             await self.rest_account_fetch_position()
 
-        if self.rest_account_fetch_position_period_seconds:
+        if self.rest_account_fetch_position_period_seconds and self.api_key:
 
             async def start_periodic_rest_account_fetch_position():
                 try:
@@ -957,10 +957,10 @@ class Exchange(ExchangeApi):
 
             self.create_task(coro=start_periodic_rest_account_fetch_position())
 
-        if self.subscribe_balance or self.rest_account_fetch_balance_period_seconds:
+        if (self.subscribe_balance or self.rest_account_fetch_balance_period_seconds) and self.api_key:
             await self.rest_account_fetch_balance()
 
-        if self.rest_account_fetch_balance_period_seconds:
+        if self.rest_account_fetch_balance_period_seconds and self.api_key:
 
             async def start_periodic_rest_account_fetch_balance():
                 try:

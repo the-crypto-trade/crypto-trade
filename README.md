@@ -47,6 +47,7 @@
 
 ## Examples
 * [Quick start](examples/quick_start.py).
+* [Download historical data](examples/download_historical_data.py).
 
 ## API
 * Initialize. Commonly used options: `instrument_type`, `symbols`, `subscribe_bbo`, `subscribe_trade`, `subscribe_ohlcv`, `subscribe_order`, `subscribe_fill`, `subscribe_position`, `subscribe_balance`, `trade_api_method_preference`, `margin_asset`.
