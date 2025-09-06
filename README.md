@@ -93,7 +93,7 @@ pprint.pp(exchange.bbos)
 pprint.pp(exchange.orders)
 pprint.pp(exchange.balances)
 ```
-* You may also configure to fetch historical trades/ohlcvs/orders/fills at start time. For more details, see [here](src/crypto_trade/exchange_api.py).
+* You may also configure to fetch historical trades/ohlcvs/orders/fills. One example can be found at [Download historical data](examples/download_historical_data.py). For more details, see [here](src/crypto_trade/exchange_api.py). If you configure the library to both subscribe to real-time data and fetch historical data, it will first subscribe to real-time data, then fetch historical data in reverse chronological order, so that real-time and historical data join seamlessly without any gaps.
 
 ## Paper Trading
 * When `is_paper_trading` is set to `True`, trading will be performed in a testing environment. See below for details.
