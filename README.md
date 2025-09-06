@@ -5,8 +5,11 @@
 - [Crypto Trade](#crypto-trade)
   - [Branches And Tags](#branches-and-tags)
   - [Installation](#installation)
-    - [Install From Github](#install-from-github)
-    - [Install Locally](#install-locally)
+    - [Use requirements.txt](#use-requirementstxt)
+    - [Use pyproject.toml](#use-pyprojecttoml)
+    - [Use pyproject.toml With Poetry](#use-pyprojecttoml-with-poetry)
+    - [Install Directly From Github](#install-directly-from-github)
+    - [Install Directly From Local Path](#install-directly-from-local-path)
   - [Examples](#examples)
   - [API](#api)
   - [Paper Trading](#paper-trading)
@@ -35,15 +38,31 @@
 * The `main` branch may contain experimental features. Please use tagged releases for stability.
 
 ## Installation
-* It's recommended that you install in a virtual environment of your choosing.
+* It is recommended that you install it in a virtual environment.
 
-### Install From Github
+### Use requirements.txt
+
+    git+https://github.com/the-crypto-trade/crypto-trade.git
+
+### Use pyproject.toml
+
+    [project]
+    dependencies = [
+        "crypto-trade @ git+https://github.com/the-crypto-trade/crypto-trade.git",
+    ]
+
+### Use pyproject.toml With Poetry
+
+    [tool.poetry.dependencies]
+    crypto-trade = { git = "https://github.com/the-crypto-trade/crypto-trade.git" }
+
+### Install Directly From Github
 
     pip install git+https://github.com/the-crypto-trade/crypto-trade
 
-### Install Locally
+### Install Directly From Local Path
 
-    pip install -e ".[dev]"
+    pip install /path/to/crypto-trade
 
 ## Examples
 * [Quick start](examples/quick_start.py).
