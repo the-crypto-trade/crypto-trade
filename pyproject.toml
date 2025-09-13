@@ -29,6 +29,10 @@ dev = [
     "pytest",
     "uvloop ; platform_system != 'Windows'",
     "orjson",
+    "pandas",
+    "matplotlib",
+    "numba",
+    "TA-Lib",
 ]
 
 [tool.setuptools_scm]
