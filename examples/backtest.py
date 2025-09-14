@@ -81,6 +81,7 @@ if __name__ == "__main__":
         index_col="datetime",
         usecols=["datetime", "close"],
     )
+    data.index = data.index + pd.to_timedelta("1min")
     data.rename(columns={"close": "price"}, inplace=True)
     data["rsi"] = talib.RSI(data["price"].values, timeperiod=14)
     data.dropna(inplace=True)
