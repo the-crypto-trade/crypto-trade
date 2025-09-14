@@ -30,6 +30,6 @@ jobs:
           pip install --upgrade pip
           pip install '.[dev]'
 
-      - name: Run pre-commit hook
+      - name: Run format and lint
         run: |
-          hooks/pre-commit
+          ./format_lint.sh
