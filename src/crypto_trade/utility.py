@@ -314,7 +314,7 @@ class RestRequest:
         self.path = path
         self.query_params = query_params
         if query_params:
-            self.query_string = "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted(dict(query_params).items())])
+            self.query_string = "&".join([f"{k}={v}" for k, v in sorted(dict(query_params).items())])
         else:
             self.query_string = query_string
         self.headers = headers

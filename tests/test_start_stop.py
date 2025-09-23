@@ -34,7 +34,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
         try:
             instrument_type_enum = enum_class[exchange_instrument_type_name.upper()]
         except KeyError:
-            raise ValueError(f"Invalid instrument type '{exchange_instrument_type_name}' for {exchange_name}")
+            raise ValueError(f"Unsupported instrument type '{exchange_instrument_type_name}' for {exchange_name}")
 
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
         exchange = exchange_class(

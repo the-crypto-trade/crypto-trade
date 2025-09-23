@@ -360,6 +360,7 @@ class Bybit(Exchange):
                 low_price=x[3],
                 close_price=x[4],
                 volume=x[5],
+                base_volume=x[5],
                 quote_volume=x[6],
             )
             for x in json_deserialized_payload["result"]["list"]
@@ -767,6 +768,7 @@ class Bybit(Exchange):
                 low_price=x["low"],
                 close_price=x["close"],
                 volume=x["volume"],
+                base_volume=x["volume"],
                 quote_volume=x["turnover"],
             )
             for x in json_deserialized_payload["data"]
@@ -874,9 +876,6 @@ class Bybit(Exchange):
         return json_payload
 
     def convert_dict_to_order(self, *, input, api_method, symbol):
-        if symbol in self.all_instrument_information and self.all_instrument_information[symbol].contract_size_as_decimal:
-            self.all_instrument_information[symbol].contract_size_as_decimal
-
         return Order(
             api_method=api_method,
             symbol=symbol,
@@ -893,6 +892,7 @@ class Bybit(Exchange):
             is_reduce_only=input["reduceOnly"],
             cumulative_filled_quantity=input["cumExecQty"] or None,
             cumulative_filled_quote_quantity=input["cumExecValue"] or None,
+            average_filled_price=input["avgPrice"] or None,
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["createdTime"]),
             status=self.order_status_mapping[input["orderStatus"]],
         )
@@ -914,7 +914,7 @@ class Bybit(Exchange):
             is_maker=input["isMaker"],
             fee_asset=input.get("feeCurrency"),
             fee_quantity=remove_leading_negative_sign_in_string(input=exec_fee) if exec_fee else None,
-            is_fee_rebate=exec_fee.startswith("-") if exec_fee else None,
+            is_fee_rebate=exec_fee.startswith("-") if exec_fee and not Decimal(exec_fee).is_zero() else None,
         )
 
     def convert_dict_to_position(self, *, input, api_method):

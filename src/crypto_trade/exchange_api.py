@@ -283,6 +283,7 @@ class Ohlcv(BaseModel):
     low_price: Optional[str] = None
     close_price: Optional[str] = None
     volume: Optional[str] = None
+    base_volume: Optional[bool] = None
     quote_volume: Optional[bool] = None
 
     @cached_property
@@ -324,6 +325,14 @@ class Ohlcv(BaseModel):
     @cached_property
     def volume_as_decimal(self):
         return Decimal(self.volume) if self.volume else None
+
+    @cached_property
+    def base_volume_as_float(self):
+        return float(self.base_volume) if self.base_volume else None
+
+    @cached_property
+    def base_volume_as_decimal(self):
+        return Decimal(self.base_volume) if self.base_volume else None
 
     @cached_property
     def quote_volume_as_float(self):
@@ -370,6 +379,7 @@ class Order(BaseModel):
 
     cumulative_filled_quantity: Optional[str] = None
     cumulative_filled_quote_quantity: Optional[str] = None
+    average_filled_price: Optional[str] = None
 
     exchange_create_time_point: Optional[Tuple[int, int]] = None
     local_update_time_point: Optional[Tuple[int, int]] = None
@@ -437,6 +447,14 @@ class Order(BaseModel):
     def cumulative_filled_quote_quantity_as_decimal_with_sign(self):
         return (1 if self.is_buy else -1) * Decimal(self.cumulative_filled_quote_quantity) if self.cumulative_filled_quote_quantity else None
 
+    @cached_property
+    def average_filled_price_as_float(self):
+        return float(self.average_filled_price) if self.average_filled_price else None
+
+    @cached_property
+    def average_filled_price_as_decimal(self):
+        return Decimal(self.cumulative_filled_quoteaverage_filled_price_quantity) if self.average_filled_price else None
+
     @property
     def is_in_flight(self):
         return self.status <= OrderStatus.CANCEL_IN_FLIGHT
@@ -471,6 +489,7 @@ class Fill(BaseModel):
     is_buy: Optional[bool] = None
     price: Optional[str] = None
     quantity: Optional[str] = None
+    quote_quantity: Optional[str] = None
     is_maker: Optional[bool] = None
 
     fee_asset: Optional[str] = None
@@ -498,12 +517,23 @@ class Fill(BaseModel):
         return Decimal(self.quantity) if self.quantity else None
 
     @cached_property
+    def quote_quantity_as_float(self):
+        return float(self.quote_quantity) if self.quote_quantity else None
+
+    @cached_property
+    def quote_quantity_as_decimal(self):
+        return Decimal(self.quote_quantity) if self.quote_quantity else None
+
+    @cached_property
     def fee_quantity_as_float(self):
         return float(self.fee_quantity) if self.fee_quantity else None
 
     @cached_property
     def fee_quantity_as_decimal(self):
         return Decimal(self.fee_quantity) if self.fee_quantity else None
+
+
+
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -604,7 +634,6 @@ class Balance(BaseModel):
     def quantity_as_decimal(self):
         return Decimal(self.quantity) if self.quantity else None
 
-
 class Exchange(ExchangeApi):
 
     def __init__(
@@ -638,6 +667,10 @@ class Exchange(ExchangeApi):
         api_key: str = "",
         api_secret: str = "",
         api_passphrase: str = "",
+        # account (only applicable to binance)
+        websocket_order_entry_api_key: str = "",
+        websocket_order_entry_api_private_key_path: str = "",
+        websocket_order_entry_api_private_key_password: str = "",
         # order
         subscribe_order: bool = False,
         fetch_historical_order_at_start: bool = False,
@@ -713,7 +746,7 @@ class Exchange(ExchangeApi):
             self.logger = Logger(level=LogLevel.WARNING, name=f"{self.name}__{self.instrument_type}")
 
         if not self.is_instrument_type_valid(instrument_type=instrument_type):
-            self.logger.critical(Exception(f"invalid instrument_type {instrument_type} for exchange {self.name}"))
+            self.logger.critical(ValueError(f"Unsupported instrument_type {instrument_type} for exchange {self.name}"))
 
         self.subscribe_bbo = subscribe_bbo
 
@@ -741,6 +774,10 @@ class Exchange(ExchangeApi):
         self.api_key = api_key
         self.api_secret = api_secret
         self.api_passphrase = api_passphrase
+        self.websocket_order_entry_api_key = websocket_order_entry_api_key
+        self.websocket_order_entry_api_private_key_path = websocket_order_entry_api_private_key_path
+        self.websocket_order_entry_api_private_key_password = websocket_order_entry_api_private_key_password
+        self.websocket_order_entry_api_private_key = None
 
         self.subscribe_order = subscribe_order
         self.fetch_historical_order_at_start = fetch_historical_order_at_start
@@ -870,6 +907,8 @@ class Exchange(ExchangeApi):
 
         self.all_tasks: Set[asyncio.Task] = set()
 
+        self.default_client_rest_request_timeout_seconds = 10
+
     def __str__(self):
         return f"{self.exchange_id}"
 
@@ -878,6 +917,10 @@ class Exchange(ExchangeApi):
 
     async def start(self):
         self.logger.info("starting...")
+
+        if self.websocket_order_entry_api_key:
+            with open(self.websocket_order_entry_api_private_key_path, 'rb') as f:
+                self.websocket_order_entry_api_private_key = load_pem_private_key(data=f.read(), password=(self.websocket_order_entry_api_private_key_password.encode() if self.websocket_order_entry_api_private_key_password else None))
 
         if self.rest_market_data_fetch_all_instrument_information_at_start or self.rest_market_data_fetch_all_instrument_information_period_seconds:
             await self.rest_market_data_fetch_all_instrument_information()
@@ -1194,7 +1237,7 @@ class Exchange(ExchangeApi):
     def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
         return None
 
-    async def send_rest_request(self, *, rest_request_function, delay_seconds=0, timeout_seconds=10):
+    async def send_rest_request(self, *, rest_request_function, delay_seconds=0, timeout_seconds=self.default_client_rest_request_timeout_seconds):
         next_rest_request_function = rest_request_function
         next_rest_request_delay_seconds = delay_seconds
         while True:
@@ -1204,15 +1247,8 @@ class Exchange(ExchangeApi):
             rest_request = next_rest_request_function(time_point=time_point_now())
             self.logger.fine("rest_request", rest_request)
 
-            async with self.client_session.request(
-                method=rest_request.method,
-                url=rest_request.url,
-                params=rest_request.query_string,
-                data=rest_request.payload,
-                headers=rest_request.headers,
-                timeout=aiohttp.ClientTimeout(sock_read=timeout_seconds),
-            ) as client_response:
-                try:
+            try:
+                async with await self.perform_rest_request(rest_request=rest_request, timeout_seconds=timeout_seconds) as client_response:
                     raw_rest_response = client_response
                     rest_response = await self.rest_on_response(rest_request=rest_request, raw_rest_response=raw_rest_response)
                     self.logger.fine("rest_response", rest_response)
@@ -1223,9 +1259,19 @@ class Exchange(ExchangeApi):
                         next_rest_request_function = rest_response.next_rest_request_function
                         next_rest_request_delay_seconds = rest_response.next_rest_request_delay_seconds
 
-                except Exception as exception:
-                    self.logger.error(exception)
-                    break
+            except Exception as exception:
+                self.logger.error(exception)
+                break
+
+    async def perform_rest_request(self, *, rest_request, timeout_seconds=self.default_client_rest_request_timeout_seconds):
+        return self.client_session.request(
+            method=rest_request.method,
+            url=rest_request.url,
+            params=rest_request.query_string,
+            data=rest_request.payload,
+            headers=rest_request.headers,
+            timeout=aiohttp.ClientTimeout(sock_read=timeout_seconds),
+        )
 
     async def rest_on_response(self, *, rest_request, raw_rest_response):
         raw_rest_response_text = await raw_rest_response.text()
@@ -1762,10 +1808,13 @@ class Exchange(ExchangeApi):
     async def handle_rest_response_for_error(self, *, rest_response):
         raise NotImplementedError
 
+    async def start_websocket_connect_create_url(self, *, base_url, path):
+        return create_url(base_url=base_url, path=path)
+
     async def start_websocket_connect(self, *, base_url, path, query_params):
         try:
             while True:
-                url = create_url(base_url=base_url, path=path)
+                url = await start_websocket_connect_create_url(base_url=base_url, path=path)
 
                 websocket_connection = WebsocketConnection(base_url=base_url, path=path, query_params=query_params)
                 self.logger.fine("websocket_connection", websocket_connection)
@@ -1860,6 +1909,9 @@ class Exchange(ExchangeApi):
 
             elif self.is_websocket_push_data_for_balance(websocket_message=websocket_message):
                 await self.handle_websocket_push_data_for_balance(websocket_message=websocket_message)
+
+            elif self.is_websocket_push_data_for_system_event(websocket_message=websocket_message):
+                await self.handle_websocket_push_data_for_system_event(websocket_message=websocket_message)
 
         elif self.is_websocket_response_success(websocket_message=websocket_message):
             if self.is_websocket_response_for_create_order(websocket_message=websocket_message):
@@ -2008,6 +2060,9 @@ class Exchange(ExchangeApi):
     def is_websocket_push_data_for_balance(self, *, websocket_message):
         pass
 
+    def is_websocket_push_data_for_system_event(self, *, websocket_message):
+        pass
+
     def is_websocket_response_success(self, *, websocket_message):
         pass
 
@@ -2146,6 +2201,9 @@ class Exchange(ExchangeApi):
     async def handle_websocket_push_data_for_balance(self, *, websocket_message):
         balances = self.convert_websocket_push_data_for_balance(json_deserialized_payload=websocket_message.json_deserialized_payload)
         await self.update_websocket_push_data_for_balance(balances=balances)
+
+    async def handle_websocket_push_data_for_system_event(self, *, websocket_message):
+        raise NotImplementedError
 
     async def update_websocket_push_data_for_balance(self, *, balances):
         self.logger.trace("balances", balances)
@@ -2372,7 +2430,7 @@ class Exchange(ExchangeApi):
             if position.quantity_as_decimal.is_zero():
                 self.positions.pop(position.symbol, None)
             else:
-                self.positions[position.symbol] = position
+                self.positions[position.symbol] = self.merge_dataclass(existing_dataclass_instance=self.positions[position.symbol], new_dataclass_instance=position)
 
     def update_balance(self, *, balance):
         if balance.symbol not in self.balances or (
@@ -2383,7 +2441,7 @@ class Exchange(ExchangeApi):
             if balance.quantity_as_decimal.is_zero():
                 self.balances.pop(balance.symbol, None)
             else:
-                self.balances[balance.symbol] = balance
+                self.balances[balance.symbol] = self.merge_dataclass(existing_dataclass_instance=self.balances[balance.symbol], new_dataclass_instance=balance)
 
     async def remove_trades(self):
         self.logger.trace("self.trades", self.trades)
@@ -2481,3 +2539,12 @@ class Exchange(ExchangeApi):
         task = asyncio.create_task(coro=coro)
         self.all_tasks.add(task)
         task.add_done_callback(self.all_tasks.discard)
+
+    def merge_dataclass(self, *, existing_dataclass_instance, new_dataclass_instance):
+        updates = {}
+        for f in dataclasses.fields(new_dataclass_instance):
+            value = getattr(new_dataclass_instance, f.name)
+            if value is not None:
+                updates[f.name] = value
+
+        return dataclasses.replace(existing_dataclass_instance, **updates)

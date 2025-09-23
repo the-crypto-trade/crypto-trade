@@ -46,7 +46,7 @@ async def main():
         await exchange.create_order(
             order=Order(
                 symbol=symbol,
-                client_order_id=str(int(time.time() * 1000)),
+                client_order_id=exchange.generate_next_client_order_id(),
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
                 price=exchange.bbos[symbol].best_ask_price,
                 quantity="0.001",
@@ -75,6 +75,8 @@ async def main():
         print("\n")
 
         await exchange.stop()
+        # exchange is no longer useable after being stopped
+        # if you need to use the exchange again, please recreate it
 
     except Exception:
         print(traceback.format_exc())
