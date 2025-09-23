@@ -50,7 +50,7 @@ async def main():
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
                 price=exchange.bbos[symbol].best_ask_price,
                 quantity="0.001",
-                is_market=False,  # omit or set to True for limit order
+                is_market=False,  # omit or set to False for limit order, set to True for market order
                 extra_params=(
                     {
                         "isLeverage": 1,
