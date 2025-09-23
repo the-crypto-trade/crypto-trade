@@ -49,7 +49,7 @@ class Binance:
         #     self.delegate = BinanceMargin(**kwargs)
         # el
         if instrument_type == BinanceInstrumentType.USDS_MARGINED_FUTURES:
-            self.delegate = BinanceUSDSFutures(**kwargs)
+            self.delegate = BinanceUsdsMarginedFutures(**kwargs)
         # elif instrument_type == BinanceInstrumentType.COIN_MARGINED_FUTURES:
         #     self.delegate = BinanceCoinFutures(**kwargs)
         else:
