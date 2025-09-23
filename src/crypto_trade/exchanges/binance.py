@@ -31,7 +31,7 @@ from crypto_trade.utility import (
     unix_timestamp_milliseconds_now,
 )
 
-from crypto_trade.exchanges.delegates.binance_spot import BinanceSpot
+from crypto_trade.exchanges.delegates.binance_usds_margined_futures import BinanceUsdsMarginedFutures
 
 
 class BinanceInstrumentType(StrEnum):
@@ -50,8 +50,8 @@ class Binance:
         # el
         if instrument_type == BinanceInstrumentType.USDS_MARGINED_FUTURES:
             self.delegate = BinanceUSDSFutures(**kwargs)
-        elif instrument_type == BinanceInstrumentType.COIN_MARGINED_FUTURES:
-            self.delegate = BinanceCoinFutures(**kwargs)
+        # elif instrument_type == BinanceInstrumentType.COIN_MARGINED_FUTURES:
+        #     self.delegate = BinanceCoinFutures(**kwargs)
         else:
             raise ValueError(f"Unsupported instrument_type {instrument_type} for exchange binance")
 

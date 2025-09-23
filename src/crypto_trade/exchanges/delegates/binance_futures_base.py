@@ -192,7 +192,7 @@ class BinanceFuturesBase(BinanceBase):
     def convert_rest_response_for_all_instrument_information(self, *, json_deserialized_payload, rest_request):
         result = []
         for x in json_deserialized_payload["symbols"]:
-            filters = {y['filterType'],y for y in x['filters']}
+            filters = {y['filterType']:y for y in x['filters']}
             result.append (
                 InstrumentInformation(
                     api_method=ApiMethod.REST,
@@ -528,18 +528,17 @@ class BinanceFuturesBase(BinanceBase):
                             self.sign_request(rest_request=rest_request, time_point=time_point)
                             try:
                                 async with await self.perform_rest_request(rest_request=rest_request) as client_response:
-                                    try:
-                                        raw_rest_response = client_response
-                                        raw_rest_response_text = await raw_rest_response.text()
-                                        self.logger.trace("raw_rest_response_text", raw_rest_response_text)
-                                        rest_response = RestResponse(
-                                            rest_request=rest_request,
-                                            status_code=raw_rest_response.status,
-                                            payload=raw_rest_response_text,
-                                            headers=raw_rest_response.headers,
-                                            json_deserialize=self.json_deserialize,
-                                        )
-                                        self.logger.fine("rest_response", rest_response)
+                                    raw_rest_response = client_response
+                                    raw_rest_response_text = await raw_rest_response.text()
+                                    self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+                                    rest_response = RestResponse(
+                                        rest_request=rest_request,
+                                        status_code=raw_rest_response.status,
+                                        payload=raw_rest_response_text,
+                                        headers=raw_rest_response.headers,
+                                        json_deserialize=self.json_deserialize,
+                                    )
+                                    self.logger.fine("rest_response", rest_response)
                             except Exception as exception:
                                 self.logger.error(exception)
 
@@ -563,24 +562,23 @@ class BinanceFuturesBase(BinanceBase):
             self.sign_request(rest_request=rest_request, time_point=time_point)
             try:
                 async with await self.perform_rest_request(rest_request=rest_request) as client_response:
-                    try:
-                        raw_rest_response = client_response
-                        raw_rest_response_text = await raw_rest_response.text()
-                        self.logger.trace("raw_rest_response_text", raw_rest_response_text)
-                        rest_response = RestResponse(
-                            rest_request=rest_request,
-                            status_code=raw_rest_response.status,
-                            payload=raw_rest_response_text,
-                            headers=raw_rest_response.headers,
-                            json_deserialize=self.json_deserialize,
-                        )
-                        self.logger.fine("rest_response", rest_response)
+                    raw_rest_response = client_response
+                    raw_rest_response_text = await raw_rest_response.text()
+                    self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+                    rest_response = RestResponse(
+                        rest_request=rest_request,
+                        status_code=raw_rest_response.status,
+                        payload=raw_rest_response_text,
+                        headers=raw_rest_response.headers,
+                        json_deserialize=self.json_deserialize,
+                    )
+                    self.logger.fine("rest_response", rest_response)
 
-                        if self.is_rest_response_success(rest_response=rest_response):
-                            json_deserialized_payload=rest_response.json_deserialized_payload
-                            listen_key = json_deserialized_payload['listenKey']
-                            modified_path = f'{path}{listen_key}'
-                            return create_url(base_url=base_url, path=modified_path)
+                    if self.is_rest_response_success(rest_response=rest_response):
+                        json_deserialized_payload=rest_response.json_deserialized_payload
+                        listen_key = json_deserialized_payload['listenKey']
+                        modified_path = f'{path}{listen_key}'
+                        return create_url(base_url=base_url, path=modified_path)
 
             except Exception as exception:
                 self.logger.error(exception)
@@ -803,7 +801,7 @@ class BinanceFuturesBase(BinanceBase):
             is_maker=o["m"],
             fee_asset=o['N'],
             fee_quantity=remove_leading_negative_sign_in_string(input=x["n"]),
-            is_fee_rebate=x["n"].startswith("-") if not Decimal(x['n']).is_zero(),
+            is_fee_rebate=x["n"].startswith("-") if not Decimal(x['n']).is_zero() else None,
         )]
 
     def convert_websocket_push_data_for_position(self, *, json_deserialized_payload):

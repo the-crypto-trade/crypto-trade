@@ -1237,7 +1237,10 @@ class Exchange(ExchangeApi):
     def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
         return None
 
-    async def send_rest_request(self, *, rest_request_function, delay_seconds=0, timeout_seconds=self.default_client_rest_request_timeout_seconds):
+    async def send_rest_request(self, *, rest_request_function, delay_seconds=0, timeout_seconds=None):
+        if timeout_seconds is None:
+            timeout_seconds = self.default_client_rest_request_timeout_seconds
+
         next_rest_request_function = rest_request_function
         next_rest_request_delay_seconds = delay_seconds
         while True:
@@ -1263,7 +1266,10 @@ class Exchange(ExchangeApi):
                 self.logger.error(exception)
                 break
 
-    async def perform_rest_request(self, *, rest_request, timeout_seconds=self.default_client_rest_request_timeout_seconds):
+    async def perform_rest_request(self, *, rest_request, timeout_seconds=None):
+        if timeout_seconds is None:
+            timeout_seconds = self.default_client_rest_request_timeout_seconds
+
         return self.client_session.request(
             method=rest_request.method,
             url=rest_request.url,
