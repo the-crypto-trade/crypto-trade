@@ -37,7 +37,7 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.rest_market_data_base_url = "https://fapi.binance.com/"
+        self.rest_market_data_base_url = "https://fapi.binance.com"
         if self.is_paper_trading:
             self.rest_market_data_base_url = "https://testnet.binancefuture.com"
         self.rest_account_base_url = self.rest_market_data_base_url

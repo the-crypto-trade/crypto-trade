@@ -65,14 +65,22 @@ class BinanceFuturesBase(BinanceBase):
         return f"{base_asset}{quote_asset}"
 
     def sign_request(self, *, rest_request, time_point):
-        query_string = rest_request.query_string or '&'
-        query_string += f"{int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}"
+        if rest_request.headers is None:
+            rest_request.headers = {}
+
+        headers = rest_request.headers
+        headers["X-MBX-APIKEY"] = self.api_key
+
+        query_string = f'{rest_request.query_string}&' if rest_request.query_string else ''
+        query_string += f"timestamp={int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}&"
 
         signature = hmac.new(
             bytes(self.api_secret, "utf-8"),
             bytes(query_string, "utf-8"),
             digestmod=hashlib.sha256,
         ).hexdigest()
+
+        query_string += f"signature={signature}"
 
         rest_request.query_string = query_string
 
