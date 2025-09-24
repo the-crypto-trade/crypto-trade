@@ -72,7 +72,8 @@ class BinanceFuturesBase(BinanceBase):
         headers["X-MBX-APIKEY"] = self.api_key
 
         query_string = f'{rest_request.query_string}&' if rest_request.query_string else ''
-        query_string += f"timestamp={int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}&"
+        query_string += f"timestamp={int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}"
+        query_string += f"&recvWindow={self.api_receive_window_milliseconds}"
 
         signature = hmac.new(
             bytes(self.api_secret, "utf-8"),
@@ -80,7 +81,7 @@ class BinanceFuturesBase(BinanceBase):
             digestmod=hashlib.sha256,
         ).hexdigest()
 
-        query_string += f"signature={signature}"
+        query_string += f"&signature={signature}"
 
         rest_request.query_string = query_string
 
