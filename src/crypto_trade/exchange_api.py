@@ -4,7 +4,6 @@ try:
     from enum import StrEnum
 except ImportError:
     from strenum import StrEnum  # type: ignore
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 import asyncio
 import dataclasses
@@ -17,6 +16,7 @@ from functools import cached_property
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 import aiohttp
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from crypto_trade.utility import (
     Logger,
@@ -191,6 +191,7 @@ class InstrumentInformation(BaseModel):
     @cached_property
     def contract_multiplier_as_decimal(self):
         return Decimal(self.contract_multiplier) if self.contract_multiplier else None
+
 
 @dataclass(frozen=True, kw_only=True)
 class Bbo(BaseModel):
@@ -533,9 +534,6 @@ class Fill(BaseModel):
         return Decimal(self.fee_quantity) if self.fee_quantity else None
 
 
-
-
-
 @dataclass(frozen=True, kw_only=True)
 class Position(BaseModel):
     margin_type: Optional[MarginType] = None
@@ -633,6 +631,7 @@ class Balance(BaseModel):
     @cached_property
     def quantity_as_decimal(self):
         return Decimal(self.quantity) if self.quantity else None
+
 
 class Exchange(ExchangeApi):
 
@@ -919,8 +918,11 @@ class Exchange(ExchangeApi):
         self.logger.info("starting...")
 
         if self.websocket_order_entry_api_key:
-            with open(self.websocket_order_entry_api_private_key_path, 'rb') as f:
-                self.websocket_order_entry_api_private_key = load_pem_private_key(data=f.read(), password=(self.websocket_order_entry_api_private_key_password.encode() if self.websocket_order_entry_api_private_key_password else None))
+            with open(self.websocket_order_entry_api_private_key_path, "rb") as f:
+                self.websocket_order_entry_api_private_key = load_pem_private_key(
+                    data=f.read(),
+                    password=(self.websocket_order_entry_api_private_key_password.encode() if self.websocket_order_entry_api_private_key_password else None),
+                )
 
         if self.rest_market_data_fetch_all_instrument_information_at_start or self.rest_market_data_fetch_all_instrument_information_period_seconds:
             await self.rest_market_data_fetch_all_instrument_information()
@@ -1595,8 +1597,6 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
 
-
-
     async def update_rest_response_for_historical_trade(self, *, historical_trades):
         self.logger.trace("historical_trades", historical_trades)
         self.logger.trace("self.trades", self.trades)
@@ -1635,8 +1635,6 @@ class Exchange(ExchangeApi):
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
         rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
-
-
 
     async def update_rest_response_for_historical_ohlcv(self, *, historical_ohlcvs):
         self.logger.trace("historical_ohlcvs", historical_ohlcvs)
@@ -1706,8 +1704,6 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
 
-
-
     async def update_rest_response_for_fetch_open_order(self, *, open_orders):
         self.logger.trace("open_orders", open_orders)
         self.logger.trace("self.orders", self.orders)
@@ -1725,8 +1721,6 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
 
-
-
     async def update_rest_response_for_historical_order(self, *, historical_orders):
         self.logger.trace("historical_orders", historical_orders)
         self.logger.trace("self.orders", self.orders)
@@ -1743,8 +1737,6 @@ class Exchange(ExchangeApi):
             json_deserialized_payload=rest_response.json_deserialized_payload, rest_request=rest_response.rest_request
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
-
-
 
     async def update_rest_response_for_historical_fill(self, *, historical_fills):
         self.logger.trace("historical_fills", historical_fills)
@@ -2440,7 +2432,9 @@ class Exchange(ExchangeApi):
                 if position.quantity_as_decimal.is_zero():
                     self.positions.pop(position.symbol, None)
                 else:
-                    self.positions[position.symbol] = self.merge_dataclass(existing_dataclass_instance=self.positions[position.symbol], new_dataclass_instance=position)
+                    self.positions[position.symbol] = self.merge_dataclass(
+                        existing_dataclass_instance=self.positions[position.symbol], new_dataclass_instance=position
+                    )
 
     def update_balance(self, *, balance):
         if balance.symbol not in self.balances or (
@@ -2454,7 +2448,9 @@ class Exchange(ExchangeApi):
                 if balance.quantity_as_decimal.is_zero():
                     self.balances.pop(balance.symbol, None)
                 else:
-                    self.balances[balance.symbol] = self.merge_dataclass(existing_dataclass_instance=self.balances[balance.symbol], new_dataclass_instance=balance)
+                    self.balances[balance.symbol] = self.merge_dataclass(
+                        existing_dataclass_instance=self.balances[balance.symbol], new_dataclass_instance=balance
+                    )
 
     async def remove_trades(self):
         self.logger.trace("self.trades", self.trades)

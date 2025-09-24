@@ -3,7 +3,6 @@ import pprint
 import sys
 import time
 import traceback
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from enum import IntEnum

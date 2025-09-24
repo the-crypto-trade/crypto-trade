@@ -4,7 +4,6 @@ import asyncio
 import os
 import pprint
 import sys
-import time
 import traceback
 
 from crypto_trade.exchange_api import ApiMethod, Order
@@ -54,7 +53,7 @@ async def main():
                 symbol=symbol,
                 client_order_id=client_order_id,
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
-                price='100000',
+                price="100000",
                 quantity="0.001",
                 is_market=False,  # omit or set to True for limit order
             )

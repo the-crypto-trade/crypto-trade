@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 
 try:
     from enum import StrEnum
@@ -8,26 +6,7 @@ except ImportError:
 
 from crypto_trade.exchange_api import (
     ApiMethod,
-    Balance,
-    Bbo,
-    Exchange,
-    Fill,
-    InstrumentInformation,
     Ohlcv,
-    Order,
-    OrderStatus,
-    Position,
-    Trade,
-)
-from crypto_trade.utility import (
-    RestRequest,
-    WebsocketRequest,
-    convert_time_point_to_unix_timestamp_milliseconds,
-    convert_unix_timestamp_milliseconds_to_time_point,
-    normalize_decimal_string,
-    remove_leading_negative_sign_in_string,
-    time_point_now,
-    unix_timestamp_milliseconds_now,
 )
 from crypto_trade.exchanges.delegates.binance_futures_base import BinanceFuturesBase
 
@@ -76,16 +55,13 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
             self.websocket_market_data_base_url = "wss://testnet.binancefuture.com"
         self.websocket_account_trade_path = "/ws-fapi/v1"
 
-        self.rest_account_start_user_data_stream_path = '/fapi/v1/listenKey'
-        self.rest_account_keepalive_user_data_stream_path = '/fapi/v1/listenKey'
+        self.rest_account_start_user_data_stream_path = "/fapi/v1/listenKey"
+        self.rest_account_keepalive_user_data_stream_path = "/fapi/v1/listenKey"
         self.rest_account_keepalive_user_data_stream_interval_seconds = 600
-
-
-
 
     def convert_websocket_push_data_for_ohlcv(self, *, json_deserialized_payload):
         symbol = json_deserialized_payload["s"]
-        k = json_deserialized_payload['k']
+        k = json_deserialized_payload["k"]
 
         return [
             Ohlcv(

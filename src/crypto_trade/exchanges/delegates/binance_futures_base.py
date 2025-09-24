@@ -1,17 +1,19 @@
+import asyncio
+import base64
 import hashlib
 import hmac
-import base64
-import asyncio
+
 try:
     from enum import StrEnum
 except ImportError:
     from strenum import StrEnum  # type: ignore
+
 from decimal import Decimal
+
 from crypto_trade.exchange_api import (
     ApiMethod,
     Balance,
     Bbo,
-    Exchange,
     Fill,
     InstrumentInformation,
     Ohlcv,
@@ -20,35 +22,19 @@ from crypto_trade.exchange_api import (
     Position,
     Trade,
 )
-from crypto_trade.utility import (
-    Logger,
-    LoggerApi,
-    LogLevel,
-    RestRequest,
-    RestResponse,
-    WebsocketConnection,
-    WebsocketMessage,
-    WebsocketRequest,
-    convert_set_to_subsets,
-    convert_time_point_delta_to_seconds,
-    create_url,
-    create_url_with_query_params,
-    time_point_now,
-    time_point_subtract,
-    unix_timestamp_seconds_now,
-)
+from crypto_trade.exchanges.delegates.binance_base import BinanceBase
 from crypto_trade.utility import (
     RestRequest,
     RestResponse,
     WebsocketRequest,
     convert_time_point_to_unix_timestamp_milliseconds,
     convert_unix_timestamp_milliseconds_to_time_point,
+    create_url,
     normalize_decimal_string,
     remove_leading_negative_sign_in_string,
     time_point_now,
     unix_timestamp_milliseconds_now,
 )
-from crypto_trade.exchanges.delegates.binance_base import BinanceBase
 
 
 class BinanceFuturesBase(BinanceBase):
@@ -58,7 +44,7 @@ class BinanceFuturesBase(BinanceBase):
 
         self.rest_account_start_user_data_stream_path = None
         self.rest_account_keepalive_user_data_stream_path = None
-        self.websocket_account_system_event_listen_key_expired = 'listenKeyExpired'
+        self.websocket_account_system_event_listen_key_expired = "listenKeyExpired"
 
         self.order_status_mapping = {
             "NEW": OrderStatus.NEW,
@@ -76,9 +62,6 @@ class BinanceFuturesBase(BinanceBase):
 
         self.api_receive_window_milliseconds = 5000
 
-
-
-
     def convert_base_asset_quote_asset_to_symbol(self, *, base_asset, quote_asset):
         return f"{base_asset}{quote_asset}"
 
@@ -89,7 +72,7 @@ class BinanceFuturesBase(BinanceBase):
         headers = rest_request.headers
         headers["X-MBX-APIKEY"] = self.api_key
 
-        query_string = f'{rest_request.query_string}&' if rest_request.query_string else ''
+        query_string = f"{rest_request.query_string}&" if rest_request.query_string else ""
         query_string += f"timestamp={int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))}"
         query_string += f"&recvWindow={self.api_receive_window_milliseconds}"
 
@@ -146,7 +129,7 @@ class BinanceFuturesBase(BinanceBase):
         )
 
     def rest_account_fetch_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
-        query_params = { "symbol": symbol}
+        query_params = {"symbol": symbol}
         if order_id:
             query_params["orderId"] = order_id
         else:
@@ -177,7 +160,7 @@ class BinanceFuturesBase(BinanceBase):
     def rest_account_fetch_historical_fill_create_rest_request_function(self, *, symbol):
         return self.rest_account_create_get_request_function_with_signature(
             path=self.rest_account_fetch_historical_fill_path,
-            query_params={ "symbol": symbol, "limit": self.rest_account_fetch_historical_fill_limit},
+            query_params={"symbol": symbol, "limit": self.rest_account_fetch_historical_fill_limit},
         )
 
     def is_rest_response_for_all_instrument_information(self, *, rest_response):
@@ -219,24 +202,20 @@ class BinanceFuturesBase(BinanceBase):
     def convert_rest_response_for_all_instrument_information(self, *, json_deserialized_payload, rest_request):
         result = []
         for x in json_deserialized_payload["symbols"]:
-            filters = {y['filterType']:y for y in x['filters']}
-            result.append (
+            filters = {y["filterType"]: y for y in x["filters"]}
+            result.append(
                 InstrumentInformation(
                     api_method=ApiMethod.REST,
                     symbol=x["symbol"],
                     base_asset=x["baseAsset"],
                     quote_asset=x["quoteAsset"],
                     order_price_increment=normalize_decimal_string(input=filters["PRICE_FILTER"]["tickSize"]),
-                    order_quantity_increment=(
-                        normalize_decimal_string(input=filters["LOT_SIZE"]["stepSize"])
-                    ),
+                    order_quantity_increment=(normalize_decimal_string(input=filters["LOT_SIZE"]["stepSize"])),
                     order_quantity_min=normalize_decimal_string(input=filters["LOT_SIZE"]["minQty"]),
-                    order_quote_quantity_min=(
-                        normalize_decimal_string(input=filters["MIN_NOTIONAL"]["notional"])
-                    ),
+                    order_quote_quantity_min=(normalize_decimal_string(input=filters["MIN_NOTIONAL"]["notional"])),
                     order_quantity_max=(normalize_decimal_string(input=filters["LOT_SIZE"]["maxQty"])),
                     margin_asset=x["marginAsset"],
-                    contract_size=str(x["contractSize"]) if x.get('contractSize') else None,
+                    contract_size=str(x["contractSize"]) if x.get("contractSize") else None,
                     expiry_time=int(x["deliveryDate"]) // 1000,
                     is_open_for_trade=x["status"] == "TRADING",
                 )
@@ -362,8 +341,8 @@ class BinanceFuturesBase(BinanceBase):
     def convert_rest_response_for_fetch_position(self, *, json_deserialized_payload, rest_request):
         result = []
         for x in json_deserialized_payload:
-            position_side = x['positionSide']
-            position_amount = x['positionAmt']
+            position_side = x["positionSide"]
+            position_amount = x["positionAmt"]
             is_long = None
 
             if not Decimal(position_amount).is_zero():
@@ -374,27 +353,32 @@ class BinanceFuturesBase(BinanceBase):
                 else:
                     is_long = not position_amount.startswith("-")
 
-            result.append(Position(
-            api_method=ApiMethod.REST,
-            symbol=x["symbol"],
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["updateTime"]),
-            quantity=remove_leading_negative_sign_in_string(input=position_amount),
-            is_long=is_long,
-            entry_price=x["entryPrice"],
-            mark_price=x["markPrice"],
-            initial_margin=x["initialMargin"],
-            maintenance_margin=x["maintMargin"],
-            unrealized_pnl=x["unRealizedProfit"],
-            liquidation_price=x["liquidationPrice"],
-        ) )
+            result.append(
+                Position(
+                    api_method=ApiMethod.REST,
+                    symbol=x["symbol"],
+                    exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["updateTime"]),
+                    quantity=remove_leading_negative_sign_in_string(input=position_amount),
+                    is_long=is_long,
+                    entry_price=x["entryPrice"],
+                    mark_price=x["markPrice"],
+                    initial_margin=x["initialMargin"],
+                    maintenance_margin=x["maintMargin"],
+                    unrealized_pnl=x["unRealizedProfit"],
+                    liquidation_price=x["liquidationPrice"],
+                )
+            )
         return result
 
     def convert_rest_response_for_fetch_balance(self, *, json_deserialized_payload, rest_request):
-        return [Balance(
-            api_method=ApiMethod.REST,
-            symbol=x["asset"],
-            quantity=x["balance"],
-        ) for x in json_deserialized_payload]
+        return [
+            Balance(
+                api_method=ApiMethod.REST,
+                symbol=x["asset"],
+                quantity=x["balance"],
+            )
+            for x in json_deserialized_payload
+        ]
 
     def convert_rest_response_for_historical_order(self, *, json_deserialized_payload, rest_request):
         return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload]
@@ -414,9 +398,9 @@ class BinanceFuturesBase(BinanceBase):
                 query_params["startTime"] = start_time
 
             head = data[0]
-            head_ts = int(head['time'])
+            head_ts = int(head["time"])
             tail = data[-1]
-            tail_ts = int(tail['time'])
+            tail_ts = int(tail["time"])
 
             if head_ts < tail_ts:
                 end = head_ts
@@ -445,22 +429,25 @@ class BinanceFuturesBase(BinanceBase):
     def convert_rest_response_for_historical_fill(self, *, json_deserialized_payload, rest_request):
         symbol = rest_request.query_params["symbol"]
 
-        return [Fill(
-            api_method=ApiMethod.REST,
-            symbol=symbol,
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["time"]),
-            order_id=str(x.get("orderId")),
-            client_order_id=x.get("origClientOrderId"),
-            trade_id=x["id"],
-            is_buy=x["side"] == "BUY",
-            price=x["price"],
-            quantity=x["qty"],
-            quote_quantity=x['quoteQty'],
-            is_maker=x["maker"],
-            fee_asset=x.get("commissionAsset"),
-            fee_quantity=remove_leading_negative_sign_in_string(input=x["commission"]) if x["commission"] else None,
-            is_fee_rebate=x["commission"].startswith("-") if x["commission"] and not Decimal(x['commission']).is_zero() else None,
-        ) for x in json_deserialized_payload]
+        return [
+            Fill(
+                api_method=ApiMethod.REST,
+                symbol=symbol,
+                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["time"]),
+                order_id=str(x.get("orderId")),
+                client_order_id=x.get("origClientOrderId"),
+                trade_id=x["id"],
+                is_buy=x["side"] == "BUY",
+                price=x["price"],
+                quantity=x["qty"],
+                quote_quantity=x["quoteQty"],
+                is_maker=x["maker"],
+                fee_asset=x.get("commissionAsset"),
+                fee_quantity=remove_leading_negative_sign_in_string(input=x["commission"]) if x["commission"] else None,
+                is_fee_rebate=x["commission"].startswith("-") if x["commission"] and not Decimal(x["commission"]).is_zero() else None,
+            )
+            for x in json_deserialized_payload
+        ]
 
     def convert_rest_response_for_historical_fill_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
         symbol = rest_request.query_params["symbol"]
@@ -477,9 +464,9 @@ class BinanceFuturesBase(BinanceBase):
                 query_params["startTime"] = start_time
 
             head = data[0]
-            head_ts = int(head['time'])
+            head_ts = int(head["time"])
             tail = data[-1]
-            tail_ts = int(tail['time'])
+            tail_ts = int(tail["time"])
 
             if head_ts < tail_ts:
                 end = head_ts
@@ -523,9 +510,7 @@ class BinanceFuturesBase(BinanceBase):
             self.create_task(coro=start_rest_account_fetch_order())
 
         elif self.is_rest_response_for_fetch_order(rest_response=rest_response):
-            if (
-                rest_response.status_code == 404
-            ):
+            if rest_response.status_code == 404:
                 now_time_point = time_point_now()
                 self.replace_order(
                     symbol=rest_response.rest_request.query_params["symbol"],
@@ -541,15 +526,19 @@ class BinanceFuturesBase(BinanceBase):
             if websocket_connection.path == self.websocket_market_data_path:
                 await self.websocket_market_data_subscribe(websocket_connection=websocket_connection)
             elif websocket_connection.path == self.websocket_account_path:
+
                 async def start_periodic_rest_account_keepalive_user_data_stream():
                     try:
                         while True:
                             await asyncio.sleep(self.rest_account_keepalive_user_data_stream_interval_seconds)
                             rest_request = RestRequest(
-                                id=self.generate_next_rest_request_id(), base_url=self.rest_account_base_url, method=RestRequest.METHOD_PUT, path=self.rest_account_start_user_data_stream_path
+                                id=self.generate_next_rest_request_id(),
+                                base_url=self.rest_account_base_url,
+                                method=RestRequest.METHOD_PUT,
+                                path=self.rest_account_start_user_data_stream_path,
                             )
                             self.logger.fine("rest_request", rest_request)
-                            time_point=time_point_now()
+                            time_point = time_point_now()
                             self.sign_request(rest_request=rest_request, time_point=time_point)
                             try:
                                 async with await self.perform_rest_request(rest_request=rest_request) as client_response:
@@ -575,16 +564,18 @@ class BinanceFuturesBase(BinanceBase):
         elif websocket_connection.base_url == self.websocket_account_trade_base_url:
             await self.websocket_login(websocket_connection=websocket_connection)
 
-
     async def start_websocket_connect_create_url(self, *, base_url, path, query_params):
         if base_url == self.websocket_account_base_url and path == self.websocket_account_path:
             delay_seconds = 0
             while True:
                 rest_request = RestRequest(
-                    id=self.generate_next_rest_request_id(), base_url=self.rest_account_base_url, method=RestRequest.METHOD_POST, path=self.rest_account_start_user_data_stream_path
+                    id=self.generate_next_rest_request_id(),
+                    base_url=self.rest_account_base_url,
+                    method=RestRequest.METHOD_POST,
+                    path=self.rest_account_start_user_data_stream_path,
                 )
                 self.logger.fine("rest_request", rest_request)
-                time_point=time_point_now()
+                time_point = time_point_now()
                 self.sign_request(rest_request=rest_request, time_point=time_point)
                 try:
                     async with await self.perform_rest_request(rest_request=rest_request) as client_response:
@@ -601,8 +592,8 @@ class BinanceFuturesBase(BinanceBase):
                         self.logger.fine("rest_response", rest_response)
 
                         if self.is_rest_response_success(rest_response=rest_response):
-                            json_deserialized_payload=rest_response.json_deserialized_payload
-                            listen_key = json_deserialized_payload['listenKey']
+                            json_deserialized_payload = rest_response.json_deserialized_payload
+                            listen_key = json_deserialized_payload["listenKey"]
                             modified_path = path.format(listenKey=listen_key)
                             return create_url(base_url=base_url, path=modified_path)
 
@@ -622,16 +613,15 @@ class BinanceFuturesBase(BinanceBase):
         else:
             return await super().start_websocket_connect_create_url(base_url=base_url, path=path, query_params=query_params)
 
-
     def websocket_connection_ping_on_application_level_create_websocket_request(self):
         pass
 
     def websocket_login_create_websocket_request(self, *, time_point):
         id = self.generate_next_websocket_request_id()
         timestamp = int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))
-        params = {"apiKey":self.websocket_order_entry_api_key, "timestamp":timestamp,'recvWindow':self.api_receive_window_milliseconds}
-        payload_to_sign = '&'.join([f'{param}={value}' for param, value in sorted(params.items())])
-        params['signature'] = base64.b64encode(self.websocket_order_entry_api_private_key.sign(payload_to_sign.encode('ASCII'))).decode('ASCII')
+        params = {"apiKey": self.websocket_order_entry_api_key, "timestamp": timestamp, "recvWindow": self.api_receive_window_milliseconds}
+        payload_to_sign = "&".join([f"{param}={value}" for param, value in sorted(params.items())])
+        params["signature"] = base64.b64encode(self.websocket_order_entry_api_private_key.sign(payload_to_sign.encode("ASCII"))).decode("ASCII")
         payload = self.json_serialize(
             {
                 "id": id,
@@ -652,7 +642,9 @@ class BinanceFuturesBase(BinanceBase):
                 if self.subscribe_trade:
                     params.append(f"{lower_symbol}@{self.websocket_market_data_channel_trade}")
                 if self.subscribe_ohlcv:
-                    params.append(f"{lower_symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}")
+                    params.append(
+                        f"{lower_symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}"
+                    )
 
             id = self.generate_next_websocket_request_id()
             payload = self.json_serialize({"id": int(id), "method": "SUBSCRIBE", "params": params})
@@ -660,15 +652,13 @@ class BinanceFuturesBase(BinanceBase):
         else:
             return None
 
-
-
     def websocket_account_update_subscribe_create_websocket_request(self, *, is_subscribe):
         pass
 
     def websocket_account_create_websocket_request_params_add_common_fields(self, *, params, time_point):
         timestamp = int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))
-        params['timestamp']=timestamp
-        params['recvWindow']=self.api_receive_window_milliseconds
+        params["timestamp"] = timestamp
+        params["recvWindow"] = self.api_receive_window_milliseconds
 
     def websocket_account_create_order_create_websocket_request(self, *, order):
         id = self.generate_next_websocket_request_id()
@@ -692,9 +682,7 @@ class BinanceFuturesBase(BinanceBase):
             "e": json_deserialized_payload.get("e"),
         }
 
-        id = (
-            json_deserialized_payload.get("id")
-        )
+        id = json_deserialized_payload.get("id")
         websocket_message.websocket_request_id = str(id) if id is not None else None
 
         if websocket_message.websocket_request_id:
@@ -705,45 +693,56 @@ class BinanceFuturesBase(BinanceBase):
     def is_websocket_push_data(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return (websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"] is not None) or (websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] is not None)
+        return (websocket_connection.base_url == self.websocket_market_data_base_url and payload_summary["data,e"] is not None) or (
+            websocket_connection.base_url == self.websocket_account_base_url and payload_summary["e"] is not None
+        )
 
     def is_websocket_push_data_for_bbo(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_bbo
+        return websocket_connection.base_url == self.websocket_market_data_base_url and payload_summary["data,e"] == self.websocket_market_data_channel_bbo
 
     def is_websocket_push_data_for_trade(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_trade
+        return websocket_connection.base_url == self.websocket_market_data_base_url and payload_summary["data,e"] == self.websocket_market_data_channel_trade
 
     def is_websocket_push_data_for_ohlcv(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_ohlcv
+        return websocket_connection.base_url == self.websocket_market_data_base_url and payload_summary["data,e"] == self.websocket_market_data_channel_ohlcv
 
     def is_websocket_push_data_for_order(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_order
+        return websocket_connection.base_url == self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_order
 
     def is_websocket_push_data_for_position(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
         json_deserialized_payload = websocket_message.json_deserialized_payload
-        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_position and json_deserialized_payload['a'].get('P')
+        return (
+            websocket_connection.base_url == self.websocket_account_base_url
+            and payload_summary["e"] == self.websocket_account_channel_position
+            and json_deserialized_payload["a"].get("P")
+        )
 
     def is_websocket_push_data_for_balance(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
         json_deserialized_payload = websocket_message.json_deserialized_payload
-        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_balance and json_deserialized_payload['a'].get('B')
+        return (
+            websocket_connection.base_url == self.websocket_account_base_url
+            and payload_summary["e"] == self.websocket_account_channel_balance
+            and json_deserialized_payload["a"].get("B")
+        )
 
     def is_websocket_push_data_for_system_event(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_system_event_listen_key_expired
-
+        return (
+            websocket_connection.base_url == self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_system_event_listen_key_expired
+        )
 
     def is_websocket_response_success(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
@@ -751,36 +750,49 @@ class BinanceFuturesBase(BinanceBase):
         if websocket_connection.base_url == self.websocket_market_data_base_url:
             return not payload_summary["error"]
         elif websocket_connection.base_url == self.websocket_account_trade_base_url:
-            return not payload_summary["error"]  and payload_summary["status"] and payload_summary["status"] >= 200 and payload_summary["status"] < 300
+            return not payload_summary["error"] and payload_summary["status"] and payload_summary["status"] >= 200 and payload_summary["status"] < 300
 
     def is_websocket_response_for_create_order(self, *, websocket_message):
         websocket_request = websocket_message.websocket_request
         websocket_connection = websocket_message.websocket_connection
         json_deserialized_websocket_request_payload = self.json_deserialize(websocket_request.payload)
-        return websocket_connection.base_url == self.websocket_account_trade_base_url and json_deserialized_websocket_request_payload.get('method') == "order.create"
+        return (
+            websocket_connection.base_url == self.websocket_account_trade_base_url
+            and json_deserialized_websocket_request_payload.get("method") == "order.create"
+        )
 
     def is_websocket_response_for_cancel_order(self, *, websocket_message):
         websocket_request = websocket_message.websocket_request
         websocket_connection = websocket_message.websocket_connection
         json_deserialized_websocket_request_payload = self.json_deserialize(websocket_request.payload)
-        return websocket_connection.base_url == self.websocket_account_trade_base_url and json_deserialized_websocket_request_payload.get('method') == "order.cancel"
+        return (
+            websocket_connection.base_url == self.websocket_account_trade_base_url
+            and json_deserialized_websocket_request_payload.get("method") == "order.cancel"
+        )
 
     def is_websocket_response_for_subscribe(self, *, websocket_message):
         websocket_request = websocket_message.websocket_request
         websocket_connection = websocket_message.websocket_connection
         json_deserialized_websocket_request_payload = self.json_deserialize(websocket_request.payload)
-        return websocket_connection.base_url == self.websocket_market_data_base_url and json_deserialized_websocket_request_payload.get('method') == "SUBSCRIBE"
+        return websocket_connection.base_url == self.websocket_market_data_base_url and json_deserialized_websocket_request_payload.get("method") == "SUBSCRIBE"
 
     def is_websocket_response_for_login(self, *, websocket_message):
         websocket_request = websocket_message.websocket_request
         websocket_connection = websocket_message.websocket_connection
         json_deserialized_websocket_request_payload = self.json_deserialize(websocket_request.payload)
-        return websocket_connection.base_url == self.websocket_account_trade_base_url and json_deserialized_websocket_request_payload.get('method') == "session.logon"
+        return (
+            websocket_connection.base_url == self.websocket_account_trade_base_url
+            and json_deserialized_websocket_request_payload.get("method") == "session.logon"
+        )
 
     async def handle_websocket_push_data_for_system_event(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        if websocket_connection.base_url == self.websocket_account_base_url and websocket_connection.path == self.websocket_account_path and payload_summary["data,e"] == self.websocket_account_system_event_listen_key_expired:
+        if (
+            websocket_connection.base_url == self.websocket_account_base_url
+            and websocket_connection.path == self.websocket_account_path
+            and payload_summary["data,e"] == self.websocket_account_system_event_listen_key_expired
+        ):
             await websocket_message.websocket_connection.close()
 
     def convert_websocket_push_data_for_bbo(self, *, json_deserialized_payload):
@@ -813,54 +825,56 @@ class BinanceFuturesBase(BinanceBase):
             )
         ]
 
-
-
     def convert_websocket_push_data_for_order(self, *, json_deserialized_payload):
-        o = json_deserialized_payload['o']
+        o = json_deserialized_payload["o"]
         status = self.order_status_mapping[o["X"]]
-        exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"])
-        return [Order(
-            api_method=ApiMethod.WEBSOCKET,
-            symbol=o['s'],
-            exchange_update_time_point=exchange_update_time_point,
-            order_id=str(o["i"]),
-            client_order_id=o['c'],
-            is_buy=o["S"] == "BUY",
-            price=o["p"],
-            quantity=o["q"],
-            is_market=o["o"] == "MARKET",
-            is_post_only=o["f"] == "GTX",
-            is_fok=o["f"] == "FOK",
-            is_ioc=o["f"] == "IOC",
-            is_reduce_only=o["R"],
-            cumulative_filled_quantity=o["z"],
-            average_filled_price=o['ap'],
-            exchange_create_time_point=exchange_update_time_point if status==OrderStatus.NEW else None,
-            status=status,
-        )]
+        exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"])
+        return [
+            Order(
+                api_method=ApiMethod.WEBSOCKET,
+                symbol=o["s"],
+                exchange_update_time_point=exchange_update_time_point,
+                order_id=str(o["i"]),
+                client_order_id=o["c"],
+                is_buy=o["S"] == "BUY",
+                price=o["p"],
+                quantity=o["q"],
+                is_market=o["o"] == "MARKET",
+                is_post_only=o["f"] == "GTX",
+                is_fok=o["f"] == "FOK",
+                is_ioc=o["f"] == "IOC",
+                is_reduce_only=o["R"],
+                cumulative_filled_quantity=o["z"],
+                average_filled_price=o["ap"],
+                exchange_create_time_point=exchange_update_time_point if status == OrderStatus.NEW else None,
+                status=status,
+            )
+        ]
 
     def convert_websocket_push_data_for_fill(self, *, json_deserialized_payload):
-        o = json_deserialized_payload['o']
-        return [Fill(
-            api_method=ApiMethod.WEBSOCKET,
-            symbol=o['s'],
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
-            order_id=str(o["i"]),
-            trade_id=o["t"],
-            is_buy=o["S"] == "BUY",
-            price=o["L"],
-            quantity=o["l"],
-            is_maker=o["m"],
-            fee_asset=o['N'],
-            fee_quantity=remove_leading_negative_sign_in_string(input=x["n"]),
-            is_fee_rebate=x["n"].startswith("-") if not Decimal(x['n']).is_zero() else None,
-        )]
+        o = json_deserialized_payload["o"]
+        return [
+            Fill(
+                api_method=ApiMethod.WEBSOCKET,
+                symbol=o["s"],
+                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
+                order_id=str(o["i"]),
+                trade_id=o["t"],
+                is_buy=o["S"] == "BUY",
+                price=o["L"],
+                quantity=o["l"],
+                is_maker=o["m"],
+                fee_asset=o["N"],
+                fee_quantity=remove_leading_negative_sign_in_string(input=x["n"]),
+                is_fee_rebate=x["n"].startswith("-") if not Decimal(x["n"]).is_zero() else None,
+            )
+        ]
 
     def convert_websocket_push_data_for_position(self, *, json_deserialized_payload):
         result = []
-        for x in json_deserialized_payload["a"]['P']:
-            position_side = x['ps']
-            position_amount = x['pa']
+        for x in json_deserialized_payload["a"]["P"]:
+            position_side = x["ps"]
+            position_amount = x["pa"]
             is_long = None
 
             if not Decimal(position_amount).is_zero():
@@ -870,29 +884,32 @@ class BinanceFuturesBase(BinanceBase):
                     is_long = False
                 else:
                     is_long = not position_amount.startswith("-")
-            result.append(Position(
-            api_method=ApiMethod.WEBSOCKET,
-            symbol=x["s"],
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
-            quantity=remove_leading_negative_sign_in_string(input=position_amount),
-            is_long=is_long,
-            entry_price=x["ep"],
-            unrealized_pnl=x["up"],
-        ))
+            result.append(
+                Position(
+                    api_method=ApiMethod.WEBSOCKET,
+                    symbol=x["s"],
+                    exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
+                    quantity=remove_leading_negative_sign_in_string(input=position_amount),
+                    is_long=is_long,
+                    entry_price=x["ep"],
+                    unrealized_pnl=x["up"],
+                )
+            )
         return result
 
     def convert_websocket_push_data_for_balance(self, *, json_deserialized_payload):
-        return [Balance(
-            api_method=ApiMethod.WEBSOCKET,
-            symbol=x["a"],
-            quantity=x["wb"],
-        ) for x in json_deserialized_payload["a"]["B"]]
+        return [
+            Balance(
+                api_method=ApiMethod.WEBSOCKET,
+                symbol=x["a"],
+                quantity=x["wb"],
+            )
+            for x in json_deserialized_payload["a"]["B"]
+        ]
 
     def convert_websocket_response_for_create_order(self, *, json_deserialized_payload, websocket_request):
         result = json_deserialized_payload["result"]
-        exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(
-                unix_timestamp_milliseconds=result["updateTime"]
-            )
+        exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=result["updateTime"])
 
         return Order(
             api_method=ApiMethod.WEBSOCKET,
@@ -910,9 +927,7 @@ class BinanceFuturesBase(BinanceBase):
         return Order(
             api_method=ApiMethod.WEBSOCKET,
             symbol=result["symbol"],
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(
-                unix_timestamp_milliseconds=result["updateTime"]
-            ),
+            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=result["updateTime"]),
             order_id=str(result["orderId"]),
             client_order_id=websocket_request.json_payload["params"].get("origClientOrderId"),
             status=OrderStatus.CANCEL_ACKNOWLEDGED,
@@ -946,7 +961,9 @@ class BinanceFuturesBase(BinanceBase):
                     await self.rest_account_fetch_order(
                         symbol=websocket_message.websocket_request.json_payload["params"]["symbol"],
                         order_id=websocket_message.websocket_request.json_payload["params"].get("orderId"),
-                        client_order_id=websocket_message.websocket_request.json_payload["params"].get("newClientOrderId" if self.is_websocket_response_for_create_order(websocket_message=websocket_message) else "origClientOrderId"),
+                        client_order_id=websocket_message.websocket_request.json_payload["params"].get(
+                            "newClientOrderId" if self.is_websocket_response_for_create_order(websocket_message=websocket_message) else "origClientOrderId"
+                        ),
                     )
                 except Exception as exception:
                     self.logger.error(exception)
@@ -992,34 +1009,34 @@ class BinanceFuturesBase(BinanceBase):
 
     def convert_dict_to_order(self, *, input, api_method):
         status = self.order_status_mapping[input["status"]]
-        exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updateTime"])
+        exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updateTime"])
         return Order(
             api_method=api_method,
-            symbol=input['symbol'],
+            symbol=input["symbol"],
             exchange_update_time_point=exchange_update_time_point,
             order_id=str(input.get("orderId")) if input.get("orderId") else None,
             client_order_id=input.get("origClientOrderId"),
             is_buy=input["side"] == "BUY",
-            price=input["price"] ,
+            price=input["price"],
             quantity=input["origQty"],
             is_market=input["type"] == "Market",
             is_post_only=input["timeInForce"] == "PostOnly",
             is_fok=input["timeInForce"] == "FOK",
             is_ioc=input["timeInForce"] == "IOC",
             is_reduce_only=input["reduceOnly"],
-            cumulative_filled_quantity=input.get("cumQty") ,
-            cumulative_filled_quote_quantity=input["cumQuote"] ,
-            average_filled_price=input["avgPrice"] ,
-            exchange_create_time_point=exchange_update_time_point if status==OrderStatus.NEW else None,
+            cumulative_filled_quantity=input.get("cumQty"),
+            cumulative_filled_quote_quantity=input["cumQuote"],
+            average_filled_price=input["avgPrice"],
+            exchange_create_time_point=exchange_update_time_point if status == OrderStatus.NEW else None,
             status=status,
         )
 
     def convert_ohlcv_interval_seconds_to_string(self, *, ohlcv_interval_seconds):
-            if ohlcv_interval_seconds < 3600:
-                return f"{ohlcv_interval_seconds//60}m"
-            elif ohlcv_interval_seconds < 86400:
-                return f"{ohlcv_interval_seconds//3600}h"
-            elif ohlcv_interval_seconds < 604800:
-                return f"{ohlcv_interval_seconds//86400}d"
-            else:
-                return "1w"
+        if ohlcv_interval_seconds < 3600:
+            return f"{ohlcv_interval_seconds//60}m"
+        elif ohlcv_interval_seconds < 86400:
+            return f"{ohlcv_interval_seconds//3600}h"
+        elif ohlcv_interval_seconds < 604800:
+            return f"{ohlcv_interval_seconds//86400}d"
+        else:
+            return "1w"
