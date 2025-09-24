@@ -1297,10 +1297,10 @@ class Exchange(ExchangeApi):
                 await self.handle_rest_response_for_bbo(rest_response=rest_response)
 
             elif self.is_rest_response_for_historical_trade(rest_response=rest_response):
-                rest_response = await self.handle_rest_response_for_historical_trade(rest_response=rest_response)
+                await self.handle_rest_response_for_historical_trade(rest_response=rest_response)
 
             elif self.is_rest_response_for_historical_ohlcv(rest_response=rest_response):
-                rest_response = await self.handle_rest_response_for_historical_ohlcv(rest_response=rest_response)
+                await self.handle_rest_response_for_historical_ohlcv(rest_response=rest_response)
 
             elif self.is_rest_response_for_create_order(rest_response=rest_response):
                 await self.handle_rest_response_for_create_order(rest_response=rest_response)
@@ -1312,7 +1312,7 @@ class Exchange(ExchangeApi):
                 await self.handle_rest_response_for_fetch_order(rest_response=rest_response)
 
             elif self.is_rest_response_for_fetch_open_order(rest_response=rest_response):
-                rest_response = await self.handle_rest_response_for_fetch_open_order(rest_response=rest_response)
+                await self.handle_rest_response_for_fetch_open_order(rest_response=rest_response)
 
             elif self.is_rest_response_for_fetch_position(rest_response=rest_response):
                 await self.handle_rest_response_for_fetch_position(rest_response=rest_response)
@@ -1321,13 +1321,13 @@ class Exchange(ExchangeApi):
                 await self.handle_rest_response_for_fetch_balance(rest_response=rest_response)
 
             elif self.is_rest_response_for_historical_order(rest_response=rest_response):
-                rest_response = await self.handle_rest_response_for_historical_order(rest_response=rest_response)
+                await self.handle_rest_response_for_historical_order(rest_response=rest_response)
 
             elif self.is_rest_response_for_historical_fill(rest_response=rest_response):
-                rest_response = await self.handle_rest_response_for_historical_fill(rest_response=rest_response)
+                await self.handle_rest_response_for_historical_fill(rest_response=rest_response)
 
         else:
-            rest_response = await self.handle_rest_response_for_error(rest_response=rest_response)
+            await self.handle_rest_response_for_error(rest_response=rest_response)
 
         return rest_response
 
@@ -1594,7 +1594,7 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
 
-        return rest_response
+
 
     async def update_rest_response_for_historical_trade(self, *, historical_trades):
         self.logger.trace("historical_trades", historical_trades)
@@ -1635,7 +1635,7 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_market_data_send_consecutive_request_delay_seconds
 
-        return rest_response
+
 
     async def update_rest_response_for_historical_ohlcv(self, *, historical_ohlcvs):
         self.logger.trace("historical_ohlcvs", historical_ohlcvs)
@@ -1705,7 +1705,7 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
 
-        return rest_response
+
 
     async def update_rest_response_for_fetch_open_order(self, *, open_orders):
         self.logger.trace("open_orders", open_orders)
@@ -1724,7 +1724,7 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
 
-        return rest_response
+
 
     async def update_rest_response_for_historical_order(self, *, historical_orders):
         self.logger.trace("historical_orders", historical_orders)
@@ -1743,7 +1743,7 @@ class Exchange(ExchangeApi):
         )
         rest_response.next_rest_request_delay_seconds = self.rest_account_send_consecutive_request_delay_seconds
 
-        return rest_response
+
 
     async def update_rest_response_for_historical_fill(self, *, historical_fills):
         self.logger.trace("historical_fills", historical_fills)

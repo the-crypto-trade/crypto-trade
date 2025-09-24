@@ -516,9 +516,9 @@ class BinanceFuturesBase(BinanceBase):
             async def start_rest_account_fetch_order():
                 try:
                     await self.rest_account_fetch_order(
-                        symbol=rest_response.rest_request.json_payload["symbol"],
-                        order_id=rest_response.rest_request.json_payload.get("orderId"),
-                        client_order_id=rest_response.rest_request.json_payload.get("origClientOrderId"),
+                        symbol=rest_response.rest_request.query_params["symbol"],
+                        order_id=rest_response.rest_request.query_params.get("orderId"),
+                        client_order_id=rest_response.rest_request.query_params.get("origClientOrderId"),
                     )
                 except Exception as exception:
                     self.logger.error(exception)
@@ -688,6 +688,7 @@ class BinanceFuturesBase(BinanceBase):
             "error": json_deserialized_payload.get("error"),
             "status": json_deserialized_payload.get("status"),
             "data,e": json_deserialized_payload.get("data", {}).get("e"),
+            "e": json_deserialized_payload.get("e"),
         }
 
         id = (
@@ -701,43 +702,51 @@ class BinanceFuturesBase(BinanceBase):
         return websocket_message
 
     def is_websocket_push_data(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"] is not None
+        return (websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"] is not None) or (websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] is not None)
 
     def is_websocket_push_data_for_bbo(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"]==self.websocket_market_data_channel_bbo
+        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_bbo
 
     def is_websocket_push_data_for_trade(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"]==self.websocket_market_data_channel_trade
+        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_trade
 
     def is_websocket_push_data_for_ohlcv(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"]==self.websocket_market_data_channel_ohlcv
+        return websocket_connection.base_url ==self.websocket_market_data_base_url and payload_summary["data,e"]==self.websocket_market_data_channel_ohlcv
 
     def is_websocket_push_data_for_order(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"] == self.websocket_account_channel_order
+        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_order
 
     def is_websocket_push_data_for_position(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
         json_deserialized_payload = websocket_message.json_deserialized_payload
-        return payload_summary["data,e"] == self.websocket_account_channel_position and json_deserialized_payload['a'].get('P')
+        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_position and json_deserialized_payload['a'].get('P')
 
     def is_websocket_push_data_for_balance(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
         json_deserialized_payload = websocket_message.json_deserialized_payload
-        return payload_summary["data,e"] == self.websocket_account_channel_balance and json_deserialized_payload['a'].get('B')
+        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_balance and json_deserialized_payload['a'].get('B')
 
     def is_websocket_push_data_for_system_event(self, *, websocket_message):
+        websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        return payload_summary["data,e"] == self.websocket_account_system_event_listen_key_expired
+        return websocket_connection.base_url ==self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_system_event_listen_key_expired
 
 
     def is_websocket_response_success(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
         websocket_connection = websocket_message.websocket_connection
+        payload_summary = websocket_message.payload_summary
         if websocket_connection.base_url == self.websocket_market_data_base_url:
             return not payload_summary["error"]
         elif websocket_connection.base_url == self.websocket_account_trade_base_url:
@@ -768,8 +777,8 @@ class BinanceFuturesBase(BinanceBase):
         return websocket_connection.base_url == self.websocket_account_trade_base_url and json_deserialized_websocket_request_payload.get('method') == "session.logon"
 
     async def handle_websocket_push_data_for_system_event(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
         websocket_connection = websocket_message.websocket_connection
+        payload_summary = websocket_message.payload_summary
         if websocket_connection.base_url == self.websocket_account_base_url and websocket_connection.path == self.websocket_account_path and payload_summary["data,e"] == self.websocket_account_system_event_listen_key_expired:
             await websocket_message.websocket_connection.close()
 

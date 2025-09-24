@@ -51,7 +51,7 @@ async def main():
                 symbol=symbol,
                 client_order_id=exchange.generate_next_client_order_id(),
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
-                price='90000',
+                price='100000',
                 quantity="0.001",
                 is_market=False,  # omit or set to True for limit order
             )
