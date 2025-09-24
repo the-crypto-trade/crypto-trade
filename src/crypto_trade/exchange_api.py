@@ -4,6 +4,7 @@ try:
     from enum import StrEnum
 except ImportError:
     from strenum import StrEnum  # type: ignore
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 import asyncio
 import dataclasses

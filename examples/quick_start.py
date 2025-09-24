@@ -28,9 +28,11 @@ async def main():
             is_paper_trading=False,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
             api_key=os.getenv("BINANCE_API_KEY", ""),
             api_secret=os.getenv("BINANCE_API_SECRET", ""),
+            websocket_order_entry_api_key=os.getenv("BINANCE_WEBSOCKET_ORDER_ENTRY_API_KEY", ""),
+            websocket_order_entry_api_private_key_path=os.getenv("BINANCE_WEBSOCKET_ORDER_ENTRY_API_PRIVATE_KEY_PATH", ""),
             logger=logger,
             start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "2")),  # increase this value if connecting through a slow VPN
-            trade_api_method_preference=ApiMethod.REST,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
+            trade_api_method_preference=ApiMethod.WEBSOCKET,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
         )
 
         await exchange.start()
@@ -46,12 +48,13 @@ async def main():
         pprint.pp(exchange.balances)
         print("\n")
 
+        client_order_id = exchange.generate_next_client_order_id()
         await exchange.create_order(
             order=Order(
                 symbol=symbol,
-                client_order_id=exchange.generate_next_client_order_id(),
+                client_order_id=client_order_id,
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
-                price='114000',
+                price='100000',
                 quantity="0.001",
                 is_market=False,  # omit or set to True for limit order
             )
@@ -59,7 +62,7 @@ async def main():
 
         await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "0.2")))  # increase this value if connecting through a slow VPN
 
-        print("AFTER submitting order\n")
+        print(f"AFTER submitting order client_order_id {client_order_id}\n")
         print("bbos:")
         pprint.pp(exchange.bbos)
         print("\n")
@@ -72,6 +75,13 @@ async def main():
         print("balances:")
         pprint.pp(exchange.balances)
         print("\n")
+        await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "0.2")))  # increase this value if connecting through a slow VPN
+
+        # for order in exchange.orders[symbol]:
+        #     if order.is_eligible_to_cancel:
+        #         await exchange.cancel_order(symbol=symbol, order_id=order.order_id)
+
+        await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "0.2")))  # increase this value if connecting through a slow VPN
 
         await exchange.stop()
         # exchange is no longer useable after being stopped

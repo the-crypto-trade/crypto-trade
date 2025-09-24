@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import base64
 import asyncio
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
 try:
     from enum import StrEnum
 except ImportError:
@@ -324,8 +323,8 @@ class BinanceFuturesBase(BinanceBase):
             api_method=ApiMethod.REST,
             symbol=rest_request.query_params["symbol"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["updateTime"]),
-            order_id=json_deserialized_payload["orderId"],
-            client_order_id=rest_request.query_params.get("origClientOrderId"),
+            order_id=str(json_deserialized_payload["orderId"]),
+            client_order_id=rest_request.query_params.get("newClientOrderId"),
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["updateTime"]),
             status=OrderStatus.CREATE_ACKNOWLEDGED,
         )
@@ -335,7 +334,7 @@ class BinanceFuturesBase(BinanceBase):
             api_method=ApiMethod.REST,
             symbol=rest_request.query_params["symbol"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["updateTime"]),
-            order_id=json_deserialized_payload["orderId"],
+            order_id=str(json_deserialized_payload["orderId"]),
             client_order_id=rest_request.query_params.get("origClientOrderId"),
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["updateTime"]),
             status=OrderStatus.CANCEL_ACKNOWLEDGED,
@@ -343,19 +342,19 @@ class BinanceFuturesBase(BinanceBase):
 
     def convert_rest_response_for_fetch_order(self, *, json_deserialized_payload, rest_request):
         if json_deserialized_payload:
-            return self.convert_dict_to_order(input=json_deserialized_payload, api_method=ApiMethod.REST, symbol=x["symbol"])
+            return self.convert_dict_to_order(input=json_deserialized_payload, api_method=ApiMethod.REST)
         else:
             return Order(
                 api_method=ApiMethod.REST,
                 symbol=rest_request.query_params["symbol"],
                 exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["time"]),
-                order_id=rest_request.query_params.get("orderId"),
+                order_id=str(rest_request.query_params.get("orderId")) if rest_request.query_params.get("orderId") else None,
                 client_order_id=rest_request.query_params.get("origClientOrderId"),
                 status=OrderStatus.REJECTED,
             )
 
     def convert_rest_response_for_fetch_open_order(self, *, json_deserialized_payload, rest_request):
-        return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST, symbol=x["symbol"]) for x in json_deserialized_payload]
+        return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload]
 
     def convert_rest_response_for_fetch_open_order_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
         pass
@@ -398,9 +397,7 @@ class BinanceFuturesBase(BinanceBase):
         ) for x in json_deserialized_payload]
 
     def convert_rest_response_for_historical_order(self, *, json_deserialized_payload, rest_request):
-        symbol = rest_request.query_params["symbol"]
-
-        return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST, symbol=symbol) for x in json_deserialized_payload]
+        return [self.convert_dict_to_order(input=x, api_method=ApiMethod.REST) for x in json_deserialized_payload]
 
     def convert_rest_response_for_historical_order_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
         symbol = rest_request.query_params["symbol"]
@@ -452,7 +449,7 @@ class BinanceFuturesBase(BinanceBase):
             api_method=ApiMethod.REST,
             symbol=symbol,
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["time"]),
-            order_id=x.get("orderId"),
+            order_id=str(x.get("orderId")),
             client_order_id=x.get("origClientOrderId"),
             trade_id=x["id"],
             is_buy=x["side"] == "BUY",
@@ -632,11 +629,9 @@ class BinanceFuturesBase(BinanceBase):
     def websocket_login_create_websocket_request(self, *, time_point):
         id = self.generate_next_websocket_request_id()
         timestamp = int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))
-
-        params = {"apiKey":self.api_key, "timestamp":timestamp,}
-        payload = '&'.join([f'{param}={value}' for param, value in sorted(params.items())])
-        params['signature'] = base64.b64encode(self.websocket_order_entry_api_private_key.sign(payload.encode('ASCII'))).decode('ASCII')
-
+        params = {"apiKey":self.websocket_order_entry_api_key, "timestamp":timestamp,'recvWindow':self.api_receive_window_milliseconds}
+        payload_to_sign = '&'.join([f'{param}={value}' for param, value in sorted(params.items())])
+        params['signature'] = base64.b64encode(self.websocket_order_entry_api_private_key.sign(payload_to_sign.encode('ASCII'))).decode('ASCII')
         payload = self.json_serialize(
             {
                 "id": id,
@@ -644,7 +639,6 @@ class BinanceFuturesBase(BinanceBase):
                 "params": params,
             }
         )
-
         return self.websocket_create_request(id=id, payload=payload)
 
     def websocket_market_data_update_subscribe_create_websocket_request(self, *, symbols, is_subscribe):
@@ -671,14 +665,21 @@ class BinanceFuturesBase(BinanceBase):
     def websocket_account_update_subscribe_create_websocket_request(self, *, is_subscribe):
         pass
 
+    def websocket_account_create_websocket_request_params_add_common_fields(self, *, params, time_point):
+        timestamp = int(convert_time_point_to_unix_timestamp_milliseconds(time_point=time_point))
+        params['timestamp']=timestamp
+        params['recvWindow']=self.api_receive_window_milliseconds
+
     def websocket_account_create_order_create_websocket_request(self, *, order):
         id = self.generate_next_websocket_request_id()
         params = self.account_create_order_create_params(order=order)
-        return WebsocketRequest(id=id, json_payload={"order.place": id, "method": "order.place", "params": params}, json_serialize=self.json_serialize)
+        self.websocket_account_create_websocket_request_params_add_common_fields(params=params, time_point=time_point_now())
+        return WebsocketRequest(id=id, json_payload={"id": id, "method": "order.place", "params": params}, json_serialize=self.json_serialize)
 
     def websocket_account_cancel_order_create_websocket_request(self, *, symbol, order_id=None, client_order_id=None):
         id = self.generate_next_websocket_request_id()
         params = self.account_cancel_order_create_params(symbol=symbol, order_id=order_id, client_order_id=client_order_id)
+        self.websocket_account_create_websocket_request_params_add_common_fields(params=params, time_point=time_point_now())
         return WebsocketRequest(id=id, json_payload={"id": id, "method": "order.cancel", "params": params}, json_serialize=self.json_serialize)
 
     def websocket_on_message_extract_data(self, *, websocket_connection, websocket_message):
@@ -823,6 +824,7 @@ class BinanceFuturesBase(BinanceBase):
             symbol=o['s'],
             exchange_update_time_point=exchange_update_time_point,
             order_id=str(o["i"]),
+            client_order_id=o['c'],
             is_buy=o["S"] == "BUY",
             price=o["p"],
             quantity=o["q"],
@@ -988,12 +990,12 @@ class BinanceFuturesBase(BinanceBase):
             json_payload["origClientOrderId"] = client_order_id
         return json_payload
 
-    def convert_dict_to_order(self, *, input, api_method, symbol):
+    def convert_dict_to_order(self, *, input, api_method):
         status = self.order_status_mapping[input["status"]]
         exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updateTime"])
         return Order(
             api_method=api_method,
-            symbol=symbol,
+            symbol=input['symbol'],
             exchange_update_time_point=exchange_update_time_point,
             order_id=str(input.get("orderId")) if input.get("orderId") else None,
             client_order_id=input.get("origClientOrderId"),
