@@ -7,7 +7,7 @@ try:
     from enum import StrEnum
 except ImportError:
     from strenum import StrEnum  # type: ignore
-
+from decimal import Decimal
 from crypto_trade.exchange_api import (
     ApiMethod,
     Balance,
@@ -368,9 +368,9 @@ class BinanceFuturesBase(BinanceBase):
             is_long = None
 
             if not Decimal(position_amount).is_zero():
-                if pos_side == "LONG":
+                if position_side == "LONG":
                     is_long = True
-                elif pos_side == "SHORT":
+                elif position_side == "SHORT":
                     is_long = False
                 else:
                     is_long = not position_amount.startswith("-")
@@ -378,7 +378,7 @@ class BinanceFuturesBase(BinanceBase):
             result.append(Position(
             api_method=ApiMethod.REST,
             symbol=x["symbol"],
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["updatedTime"]),
+            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=x["updateTime"]),
             quantity=remove_leading_negative_sign_in_string(input=position_amount),
             is_long=is_long,
             entry_price=x["entryPrice"],
@@ -840,7 +840,7 @@ class BinanceFuturesBase(BinanceBase):
     def convert_websocket_push_data_for_fill(self, *, json_deserialized_payload):
         o = json_deserialized_payload['o']
         return [Fill(
-            api_method=ApiMethod.Websocket,
+            api_method=ApiMethod.WEBSOCKET,
             symbol=o['s'],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
             order_id=str(o["i"]),
@@ -862,14 +862,14 @@ class BinanceFuturesBase(BinanceBase):
             is_long = None
 
             if not Decimal(position_amount).is_zero():
-                if pos_side == "LONG":
+                if position_side == "LONG":
                     is_long = True
-                elif pos_side == "SHORT":
+                elif position_side == "SHORT":
                     is_long = False
                 else:
                     is_long = not position_amount.startswith("-")
             result.append(Position(
-            api_method=ApiMethod.Websocket,
+            api_method=ApiMethod.WEBSOCKET,
             symbol=x["s"],
             exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
             quantity=remove_leading_negative_sign_in_string(input=position_amount),
@@ -881,7 +881,7 @@ class BinanceFuturesBase(BinanceBase):
 
     def convert_websocket_push_data_for_balance(self, *, json_deserialized_payload):
         return [Balance(
-            api_method=ApiMethod.Websocket,
+            api_method=ApiMethod.WEBSOCKET,
             symbol=x["a"],
             quantity=x["wb"],
         ) for x in json_deserialized_payload["a"]["B"]]
@@ -989,24 +989,27 @@ class BinanceFuturesBase(BinanceBase):
         return json_payload
 
     def convert_dict_to_order(self, *, input, api_method, symbol):
+        status = self.order_status_mapping[input["status"]]
+        exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updateTime"])
         return Order(
             api_method=api_method,
             symbol=symbol,
-            exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["updatedTime"]),
+            exchange_update_time_point=exchange_update_time_point,
             order_id=str(input.get("orderId")) if input.get("orderId") else None,
             client_order_id=input.get("origClientOrderId"),
             is_buy=input["side"] == "BUY",
-            price=input["price"] or None,
-            quantity=input["qty"],
-            is_market=input["orderType"] == "Market",
+            price=input["price"] ,
+            quantity=input["origQty"],
+            is_market=input["type"] == "Market",
             is_post_only=input["timeInForce"] == "PostOnly",
             is_fok=input["timeInForce"] == "FOK",
             is_ioc=input["timeInForce"] == "IOC",
             is_reduce_only=input["reduceOnly"],
-            cumulative_filled_quantity=input["cumExecQty"] or None,
-            cumulative_filled_quote_quantity=input["cumExecValue"] or None,
-            exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["createdTime"]),
-            status=self.order_status_mapping[input["orderStatus"]],
+            cumulative_filled_quantity=input.get("cumQty") ,
+            cumulative_filled_quote_quantity=input["cumQuote"] ,
+            average_filled_price=input["avgPrice"] ,
+            exchange_create_time_point=exchange_update_time_point if status==OrderStatus.NEW else None,
+            status=status,
         )
 
     def convert_ohlcv_interval_seconds_to_string(self, *, ohlcv_interval_seconds):
