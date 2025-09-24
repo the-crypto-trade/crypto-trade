@@ -962,6 +962,8 @@ class Exchange(ExchangeApi):
             await self.rest_account_fetch_open_order()
             if self.rest_account_cancel_open_order_at_start:
                 await self.cancel_orders(trade_api_method_preference=ApiMethod.REST)
+                self.orders = {}
+                await self.rest_account_fetch_open_order()
 
         if self.rest_account_check_open_order_period_seconds:
 
@@ -1818,6 +1820,7 @@ class Exchange(ExchangeApi):
 
                 try:
                     url = await self.start_websocket_connect_create_url(base_url=base_url, path=path, query_params=query_params)
+                    self.logger.trace(f"url = {url}")
                     async with self.client_session.ws_connect(
                         url, params=query_params, heartbeat=self.websocket_connection_protocol_level_heartbeat_period_seconds
                     ) as client_websocket_response:
