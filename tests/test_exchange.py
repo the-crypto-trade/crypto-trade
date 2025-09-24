@@ -9,7 +9,7 @@ from crypto_trade.exchanges.binance import Binance, BinanceInstrumentType
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 
-all_instruments = ["okx__spot__BTC-USDT", "bybit__spot__BTCUSDT", "binance__spot__BTCUSDT"]
+all_instruments = ["okx__spot__BTC-USDT", "bybit__spot__BTCUSDT"]
 
 
 async def main(instrument):

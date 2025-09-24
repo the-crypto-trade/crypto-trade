@@ -5,6 +5,7 @@ import traceback
 
 import pytest
 
+from crypto_trade.exchanges.binance import Binance, BinanceInstrumentType
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 from crypto_trade.utility import unix_timestamp_seconds_now
@@ -12,12 +13,10 @@ from crypto_trade.utility import unix_timestamp_seconds_now
 EXCHANGE_CLASSES = {
     "Bybit": Bybit,
     "Okx": Okx,
+    "Binance": Binance,
 }
 
-EXCHANGE_INSTRUMENT_TYPES = {
-    "Bybit": BybitInstrumentType,
-    "Okx": OkxInstrumentType,
-}
+EXCHANGE_INSTRUMENT_TYPES = {"Bybit": BybitInstrumentType, "Okx": OkxInstrumentType, "Binance": BinanceInstrumentType}
 
 
 async def main(exchange_name, exchange_instrument_type_name, symbol):
@@ -79,6 +78,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
         ("Bybit", "SPOT", "BTCUSDT"),
         ("Bybit", "LINEAR", "BTCUSDT"),
         ("Bybit", "INVERSE", "BTCUSD"),
+        ("Binance", "USDS_MARGINED_FUTURES", "BTCUSDT"),
     ],
 )
 def test_start_stop(exchange, exchange_instrument_type, symbol):
