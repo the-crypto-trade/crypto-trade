@@ -1,4 +1,3 @@
-
 try:
     from enum import StrEnum
 except ImportError:

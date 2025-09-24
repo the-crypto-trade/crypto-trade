@@ -31,7 +31,7 @@ async def main():
             websocket_order_entry_api_private_key_path=os.getenv("BINANCE_WEBSOCKET_ORDER_ENTRY_API_PRIVATE_KEY_PATH", ""),
             logger=logger,
             start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "2")),  # increase this value if connecting through a slow VPN
-            trade_api_method_preference=ApiMethod.WEBSOCKET,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
+            trade_api_method_preference=ApiMethod.REST,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
         )
 
         await exchange.start()
@@ -43,6 +43,9 @@ async def main():
         print("orders:")
         pprint.pp(exchange.orders)
         print("\n")
+        print("positions:")
+        pprint.pp(exchange.positions)
+        print("\n")
         print("balances:")
         pprint.pp(exchange.balances)
         print("\n")
@@ -52,14 +55,14 @@ async def main():
             order=Order(
                 symbol=symbol,
                 client_order_id=client_order_id,
-                is_buy=os.getenv("SIDE", "BUY") == "BUY",
-                price="100000",
+                is_buy=os.getenv("SIDE", "SELL") == "BUY",
+                # price="114000",
                 quantity="0.001",
-                is_market=False,  # omit or set to True for limit order
+                is_market=True,  # omit or set to True for limit order
             )
         )
 
-        await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "0.2")))  # increase this value if connecting through a slow VPN
+        await asyncio.sleep(float(os.getenv("SLEEP_SECONDS", "1")))  # increase this value if connecting through a slow VPN
 
         print(f"AFTER submitting order client_order_id {client_order_id}\n")
         print("bbos:")

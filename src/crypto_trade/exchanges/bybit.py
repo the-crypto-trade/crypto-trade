@@ -853,8 +853,10 @@ class Bybit(Exchange):
             "side": "Buy" if order.is_buy else "Sell",
             "orderType": "Market" if order.is_market else "Limit",
             "qty": order.quantity,
-            "timeInForce": time_in_force,
         }
+
+        if not order.is_market:
+            json_payload["timeInForce"] = time_in_force
         if order.price:
             json_payload["price"] = order.price
         if order.is_reduce_only:

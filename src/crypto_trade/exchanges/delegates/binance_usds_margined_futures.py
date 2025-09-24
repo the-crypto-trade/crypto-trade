@@ -1,4 +1,3 @@
-
 try:
     from enum import StrEnum
 except ImportError:
@@ -48,7 +47,6 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
         self.websocket_account_path = "/ws/{listenKey}"
         self.websocket_account_channel_order = "ORDER_TRADE_UPDATE"
         self.websocket_account_channel_fill = "ORDER_TRADE_UPDATE"
-        self.websocket_account_channel_position = "ACCOUNT_UPDATE"
         self.websocket_account_channel_balance = "ACCOUNT_UPDATE"
         self.websocket_account_trade_base_url = "wss://ws-fapi.binance.com"
         if self.is_paper_trading:

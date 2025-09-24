@@ -717,25 +717,11 @@ class BinanceFuturesBase(BinanceBase):
         payload_summary = websocket_message.payload_summary
         return websocket_connection.base_url == self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_order
 
-    def is_websocket_push_data_for_position(self, *, websocket_message):
-        websocket_connection = websocket_message.websocket_connection
-        payload_summary = websocket_message.payload_summary
-        json_deserialized_payload = websocket_message.json_deserialized_payload
-        return (
-            websocket_connection.base_url == self.websocket_account_base_url
-            and payload_summary["e"] == self.websocket_account_channel_position
-            and json_deserialized_payload["a"].get("P")
-        )
-
     def is_websocket_push_data_for_balance(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
         payload_summary = websocket_message.payload_summary
-        json_deserialized_payload = websocket_message.json_deserialized_payload
-        return (
-            websocket_connection.base_url == self.websocket_account_base_url
-            and payload_summary["e"] == self.websocket_account_channel_balance
-            and json_deserialized_payload["a"].get("B")
-        )
+        websocket_message.json_deserialized_payload
+        return websocket_connection.base_url == self.websocket_account_base_url and payload_summary["e"] == self.websocket_account_channel_balance
 
     def is_websocket_push_data_for_system_event(self, *, websocket_message):
         websocket_connection = websocket_message.websocket_connection
@@ -872,40 +858,47 @@ class BinanceFuturesBase(BinanceBase):
 
     def convert_websocket_push_data_for_position(self, *, json_deserialized_payload):
         result = []
-        for x in json_deserialized_payload["a"]["P"]:
-            position_side = x["ps"]
-            position_amount = x["pa"]
-            is_long = None
+        if json_deserialized_payload["a"].get("P"):
+            for x in json_deserialized_payload["a"]["P"]:
+                position_side = x["ps"]
+                position_amount = x["pa"]
+                is_long = None
 
-            if not Decimal(position_amount).is_zero():
-                if position_side == "LONG":
-                    is_long = True
-                elif position_side == "SHORT":
-                    is_long = False
-                else:
-                    is_long = not position_amount.startswith("-")
-            result.append(
-                Position(
-                    api_method=ApiMethod.WEBSOCKET,
-                    symbol=x["s"],
-                    exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
-                    quantity=remove_leading_negative_sign_in_string(input=position_amount),
-                    is_long=is_long,
-                    entry_price=x["ep"],
-                    unrealized_pnl=x["up"],
+                if not Decimal(position_amount).is_zero():
+                    if position_side == "LONG":
+                        is_long = True
+                    elif position_side == "SHORT":
+                        is_long = False
+                    else:
+                        is_long = not position_amount.startswith("-")
+                result.append(
+                    Position(
+                        api_method=ApiMethod.WEBSOCKET,
+                        symbol=x["s"],
+                        exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(
+                            unix_timestamp_milliseconds=json_deserialized_payload["T"]
+                        ),
+                        quantity=remove_leading_negative_sign_in_string(input=position_amount),
+                        is_long=is_long,
+                        entry_price=x["ep"],
+                        unrealized_pnl=x["up"],
+                    )
                 )
-            )
         return result
 
     def convert_websocket_push_data_for_balance(self, *, json_deserialized_payload):
-        return [
-            Balance(
-                api_method=ApiMethod.WEBSOCKET,
-                symbol=x["a"],
-                quantity=x["wb"],
-            )
-            for x in json_deserialized_payload["a"]["B"]
-        ]
+        return (
+            [
+                Balance(
+                    api_method=ApiMethod.WEBSOCKET,
+                    symbol=x["a"],
+                    quantity=x["wb"],
+                )
+                for x in json_deserialized_payload["a"]["B"]
+            ]
+            if json_deserialized_payload["a"].get("B")
+            else []
+        )
 
     def convert_websocket_response_for_create_order(self, *, json_deserialized_payload, websocket_request):
         result = json_deserialized_payload["result"]
@@ -983,11 +976,13 @@ class BinanceFuturesBase(BinanceBase):
         json_payload = {
             "symbol": order.symbol,
             "newClientOrderId": order.client_order_id,
-            "side": "BUY" if order.is_buy else "Sell",
+            "side": "BUY" if order.is_buy else "SELL",
             "type": "MARKET" if order.is_market else "LIMIT",
             "quantity": order.quantity,
-            "timeInForce": time_in_force,
         }
+
+        if not order.is_market:
+            json_payload["timeInForce"] = time_in_force
         if order.price:
             json_payload["price"] = order.price
         if order.is_reduce_only:
