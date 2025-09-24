@@ -6,6 +6,8 @@ try:
 except ImportError:
     from strenum import StrEnum  # type: ignore
 
+from decimal import Decimal
+
 from crypto_trade.exchange_api import (
     ApiMethod,
     Balance,

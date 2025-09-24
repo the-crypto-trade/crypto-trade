@@ -1,8 +1,3 @@
-try:
-    from enum import StrEnum
-except ImportError:
-    from strenum import StrEnum  # type: ignore
-
 from crypto_trade.exchange_api import (
     ApiMethod,
     Ohlcv,

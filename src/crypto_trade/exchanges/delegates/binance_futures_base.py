@@ -2,12 +2,6 @@ import asyncio
 import base64
 import hashlib
 import hmac
-
-try:
-    from enum import StrEnum
-except ImportError:
-    from strenum import StrEnum  # type: ignore
-
 from decimal import Decimal
 
 from crypto_trade.exchange_api import (
@@ -643,7 +637,7 @@ class BinanceFuturesBase(BinanceBase):
                     params.append(f"{lower_symbol}@{self.websocket_market_data_channel_trade}")
                 if self.subscribe_ohlcv:
                     params.append(
-                        f"{lower_symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}"
+                        f"{lower_symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}"  # noqa: E501
                     )
 
             id = self.generate_next_websocket_request_id()
@@ -851,8 +845,8 @@ class BinanceFuturesBase(BinanceBase):
                 quantity=o["l"],
                 is_maker=o["m"],
                 fee_asset=o["N"],
-                fee_quantity=remove_leading_negative_sign_in_string(input=x["n"]),
-                is_fee_rebate=x["n"].startswith("-") if not Decimal(x["n"]).is_zero() else None,
+                fee_quantity=remove_leading_negative_sign_in_string(input=o["n"]),
+                is_fee_rebate=o["n"].startswith("-") if not Decimal(o["n"]).is_zero() else None,
             )
         ]
 
