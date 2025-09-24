@@ -532,7 +532,7 @@ def create_url(*, base_url, path):
 
 def create_path_with_query_params(*, path, query_params):
     if query_params:
-        return "?".join((path, "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted(dict(query_params).items())])))
+        return "?".join((path, "&".join([f"{k}={v}" for k, v in sorted(dict(query_params).items())])))
     else:
         return path
 

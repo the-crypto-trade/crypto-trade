@@ -191,7 +191,6 @@ class InstrumentInformation(BaseModel):
     def contract_multiplier_as_decimal(self):
         return Decimal(self.contract_multiplier) if self.contract_multiplier else None
 
-
 @dataclass(frozen=True, kw_only=True)
 class Bbo(BaseModel):
     best_bid_price: Optional[str] = None
@@ -1814,18 +1813,18 @@ class Exchange(ExchangeApi):
     async def handle_rest_response_for_error(self, *, rest_response):
         raise NotImplementedError
 
-    async def start_websocket_connect_create_url(self, *, base_url, path):
+    async def start_websocket_connect_create_url(self, *, base_url, path, query_params):
         return create_url(base_url=base_url, path=path)
 
     async def start_websocket_connect(self, *, base_url, path, query_params):
+        self.logger.trace(f"base_url = {base_url}, path = {path}, query_params = {query_params}")
         try:
             while True:
-                url = await start_websocket_connect_create_url(base_url=base_url, path=path)
-
                 websocket_connection = WebsocketConnection(base_url=base_url, path=path, query_params=query_params)
                 self.logger.fine("websocket_connection", websocket_connection)
 
                 try:
+                    url = await self.start_websocket_connect_create_url(base_url=base_url, path=path, query_params=query_params)
                     async with self.client_session.ws_connect(
                         url, params=query_params, heartbeat=self.websocket_connection_protocol_level_heartbeat_period_seconds
                     ) as client_websocket_response:
@@ -1882,6 +1881,7 @@ class Exchange(ExchangeApi):
             await websocket_connection.connection.send_str(websocket_request.payload)
 
     async def websocket_on_message(self, *, websocket_connection, raw_websocket_message_data):
+        self.logger.trace("websocket_connection", websocket_connection)
         self.logger.trace("raw_websocket_message_data", raw_websocket_message_data)
 
         websocket_message = WebsocketMessage(
@@ -2433,10 +2433,13 @@ class Exchange(ExchangeApi):
             or position.exchange_update_time_point is None
             or self.positions[position.symbol].exchange_update_time_point < position.exchange_update_time_point
         ):
-            if position.quantity_as_decimal.is_zero():
-                self.positions.pop(position.symbol, None)
+            if position.symbol not in self.positions:
+                self.positions[position.symbol] = position
             else:
-                self.positions[position.symbol] = self.merge_dataclass(existing_dataclass_instance=self.positions[position.symbol], new_dataclass_instance=position)
+                if position.quantity_as_decimal.is_zero():
+                    self.positions.pop(position.symbol, None)
+                else:
+                    self.positions[position.symbol] = self.merge_dataclass(existing_dataclass_instance=self.positions[position.symbol], new_dataclass_instance=position)
 
     def update_balance(self, *, balance):
         if balance.symbol not in self.balances or (
@@ -2444,10 +2447,13 @@ class Exchange(ExchangeApi):
             or balance.exchange_update_time_point is None
             or self.balances[balance.symbol].exchange_update_time_point < balance.exchange_update_time_point
         ):
-            if balance.quantity_as_decimal.is_zero():
-                self.balances.pop(balance.symbol, None)
+            if balance.symbol not in self.balances:
+                self.balances[balance.symbol] = balance
             else:
-                self.balances[balance.symbol] = self.merge_dataclass(existing_dataclass_instance=self.balances[balance.symbol], new_dataclass_instance=balance)
+                if balance.quantity_as_decimal.is_zero():
+                    self.balances.pop(balance.symbol, None)
+                else:
+                    self.balances[balance.symbol] = self.merge_dataclass(existing_dataclass_instance=self.balances[balance.symbol], new_dataclass_instance=balance)
 
     async def remove_trades(self):
         self.logger.trace("self.trades", self.trades)

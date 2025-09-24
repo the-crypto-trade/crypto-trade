@@ -66,7 +66,7 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
         self.websocket_market_data_channel_bbo = "ticker"
         self.websocket_market_data_channel_trade = "trade"
         self.websocket_market_data_channel_ohlcv = "kline"
-        self.websocket_account_path = "/ws/"
+        self.websocket_account_path = "/ws/{listenKey}"
         self.websocket_account_channel_order = "ORDER_TRADE_UPDATE"
         self.websocket_account_channel_fill = "ORDER_TRADE_UPDATE"
         self.websocket_account_channel_position = "ACCOUNT_UPDATE"

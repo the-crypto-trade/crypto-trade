@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import base64
+import asyncio
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 try:
     from enum import StrEnum
@@ -21,7 +22,25 @@ from crypto_trade.exchange_api import (
     Trade,
 )
 from crypto_trade.utility import (
+    Logger,
+    LoggerApi,
+    LogLevel,
     RestRequest,
+    RestResponse,
+    WebsocketConnection,
+    WebsocketMessage,
+    WebsocketRequest,
+    convert_set_to_subsets,
+    convert_time_point_delta_to_seconds,
+    create_url,
+    create_url_with_query_params,
+    time_point_now,
+    time_point_subtract,
+    unix_timestamp_seconds_now,
+)
+from crypto_trade.utility import (
+    RestRequest,
+    RestResponse,
     WebsocketRequest,
     convert_time_point_to_unix_timestamp_milliseconds,
     convert_unix_timestamp_milliseconds_to_time_point,
@@ -560,48 +579,51 @@ class BinanceFuturesBase(BinanceBase):
             await self.websocket_login(websocket_connection=websocket_connection)
 
 
-    async def start_websocket_connect_create_url(self, *, base_url, path):
-        delay_seconds = 0
-        while True:
-            rest_request = RestRequest(
-                id=self.generate_next_rest_request_id(), base_url=self.rest_account_base_url, method=RestRequest.METHOD_POST, path=self.rest_account_start_user_data_stream_path
-            )
-            self.logger.fine("rest_request", rest_request)
-            time_point=time_point_now()
-            self.sign_request(rest_request=rest_request, time_point=time_point)
-            try:
-                async with await self.perform_rest_request(rest_request=rest_request) as client_response:
-                    raw_rest_response = client_response
-                    raw_rest_response_text = await raw_rest_response.text()
-                    self.logger.trace("raw_rest_response_text", raw_rest_response_text)
-                    rest_response = RestResponse(
-                        rest_request=rest_request,
-                        status_code=raw_rest_response.status,
-                        payload=raw_rest_response_text,
-                        headers=raw_rest_response.headers,
-                        json_deserialize=self.json_deserialize,
-                    )
-                    self.logger.fine("rest_response", rest_response)
-
-                    if self.is_rest_response_success(rest_response=rest_response):
-                        json_deserialized_payload=rest_response.json_deserialized_payload
-                        listen_key = json_deserialized_payload['listenKey']
-                        modified_path = f'{path}{listen_key}'
-                        return create_url(base_url=base_url, path=modified_path)
-
-            except Exception as exception:
-                self.logger.error(exception)
-
-            self.logger.warning(f"delay for {delay_seconds} seconds before start user data stream")
-            await asyncio.sleep(delay_seconds)
-            delay_seconds = (
-                min(
-                    delay_seconds * self.websocket_reconnect_delay_seconds_exponential_backoff_base,
-                    self.websocket_reconnect_delay_seconds_exponential_backoff_max,
+    async def start_websocket_connect_create_url(self, *, base_url, path, query_params):
+        if base_url == self.websocket_account_base_url and path == self.websocket_account_path:
+            delay_seconds = 0
+            while True:
+                rest_request = RestRequest(
+                    id=self.generate_next_rest_request_id(), base_url=self.rest_account_base_url, method=RestRequest.METHOD_POST, path=self.rest_account_start_user_data_stream_path
                 )
-                if delay_seconds > 0
-                else self.websocket_reconnect_delay_seconds_exponential_backoff_initial
-            )
+                self.logger.fine("rest_request", rest_request)
+                time_point=time_point_now()
+                self.sign_request(rest_request=rest_request, time_point=time_point)
+                try:
+                    async with await self.perform_rest_request(rest_request=rest_request) as client_response:
+                        raw_rest_response = client_response
+                        raw_rest_response_text = await raw_rest_response.text()
+                        self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+                        rest_response = RestResponse(
+                            rest_request=rest_request,
+                            status_code=raw_rest_response.status,
+                            payload=raw_rest_response_text,
+                            headers=raw_rest_response.headers,
+                            json_deserialize=self.json_deserialize,
+                        )
+                        self.logger.fine("rest_response", rest_response)
+
+                        if self.is_rest_response_success(rest_response=rest_response):
+                            json_deserialized_payload=rest_response.json_deserialized_payload
+                            listen_key = json_deserialized_payload['listenKey']
+                            modified_path = path.format(listenKey=listen_key)
+                            return create_url(base_url=base_url, path=modified_path)
+
+                except Exception as exception:
+                    self.logger.error(exception)
+
+                self.logger.warning(f"delay for {delay_seconds} seconds before start user data stream")
+                await asyncio.sleep(delay_seconds)
+                delay_seconds = (
+                    min(
+                        delay_seconds * self.websocket_reconnect_delay_seconds_exponential_backoff_base,
+                        self.websocket_reconnect_delay_seconds_exponential_backoff_max,
+                    )
+                    if delay_seconds > 0
+                    else self.websocket_reconnect_delay_seconds_exponential_backoff_initial
+                )
+        else:
+            return await super().start_websocket_connect_create_url(base_url=base_url, path=path, query_params=query_params)
 
 
     def websocket_connection_ping_on_application_level_create_websocket_request(self):
@@ -627,18 +649,19 @@ class BinanceFuturesBase(BinanceBase):
 
     def websocket_market_data_update_subscribe_create_websocket_request(self, *, symbols, is_subscribe):
         if self.subscribe_bbo or self.subscribe_trade or self.subscribe_ohlcv:
-            args = []
+            params = []
 
             for symbol in symbols:
+                lower_symbol = symbol.lower()
                 if self.subscribe_bbo:
-                    args.append(f"{symbol}@{self.websocket_market_data_channel_bbo}")
+                    params.append(f"{lower_symbol}@{self.websocket_market_data_channel_bbo}")
                 if self.subscribe_trade:
-                    args.append(f"{symbol}@{self.websocket_market_data_channel_trade}")
+                    params.append(f"{lower_symbol}@{self.websocket_market_data_channel_trade}")
                 if self.subscribe_ohlcv:
-                    args.append(f"{symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}")
+                    params.append(f"{lower_symbol}@{self.websocket_market_data_channel_ohlcv}_{self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds)}")
 
             id = self.generate_next_websocket_request_id()
-            payload = self.json_serialize({"id": int(id), "method": "SUBSCRIBE", "args": args})
+            payload = self.json_serialize({"id": int(id), "method": "SUBSCRIBE", "params": params})
             return self.websocket_create_request(id=id, payload=payload)
         else:
             return None
@@ -714,31 +737,36 @@ class BinanceFuturesBase(BinanceBase):
 
     def is_websocket_response_success(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
-        return not payload_summary["error"]  and payload_summary["status"] and payload_summary["status"] >= 200 and payload_summary["status"] < 300
+        websocket_connection = websocket_message.websocket_connection
+        if websocket_connection.base_url == self.websocket_market_data_base_url:
+            return not payload_summary["error"]
+        elif websocket_connection.base_url == self.websocket_account_trade_base_url:
+            return not payload_summary["error"]  and payload_summary["status"] and payload_summary["status"] >= 200 and payload_summary["status"] < 300
 
     def is_websocket_response_for_create_order(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
-        return payload_summary["op"] and payload_summary["op"] == "order.create"
+        websocket_request = websocket_message.websocket_request
+        websocket_connection = websocket_message.websocket_connection
+        return websocket_connection.base_url == self.websocket_account_trade_base_url and websocket_request['payload'].get('method') == "order.create"
 
     def is_websocket_response_for_cancel_order(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
-        return payload_summary["op"] and payload_summary["op"] == "order.cancel"
+        websocket_request = websocket_message.websocket_request
+        websocket_connection = websocket_message.websocket_connection
+        return websocket_connection.base_url == self.websocket_account_trade_base_url and websocket_request['payload'].get('method') == "order.cancel"
 
     def is_websocket_response_for_subscribe(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
-        return payload_summary["op"] and payload_summary["op"] == "subscribe"
+        websocket_request = websocket_message.websocket_request
+        websocket_connection = websocket_message.websocket_connection
+        return websocket_connection.base_url == self.websocket_market_data_base_url and websocket_request['payload'].get('method') == "SUBSCRIBE"
 
     def is_websocket_response_for_login(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
-        return payload_summary["op"] and payload_summary["op"] == "auth"
-
-    def is_websocket_response_for_ping_on_application_level(self, *, websocket_message):
-        payload_summary = websocket_message.payload_summary
-        return payload_summary["op"] and payload_summary["op"] == "ping"
+        websocket_request = websocket_message.websocket_request
+        websocket_connection = websocket_message.websocket_connection
+        return websocket_connection.base_url == self.websocket_account_trade_base_url and websocket_request['payload'].get('method') == "session.logon"
 
     async def handle_websocket_push_data_for_system_event(self, *, websocket_message):
         payload_summary = websocket_message.payload_summary
-        if payload_summary["e"] == self.websocket_account_system_event_listen_key_expired:
+        websocket_connection = websocket_message.websocket_connection
+        if websocket_connection.base_url == self.websocket_account_base_url and websocket_connection.path == self.websocket_account_path and payload_summary["e"] == self.websocket_account_system_event_listen_key_expired:
             await websocket_message.websocket_connection.close()
 
     def convert_websocket_push_data_for_bbo(self, *, json_deserialized_payload):
