@@ -1,6 +1,4 @@
-from crypto_trade.exchange_api import (
-    Exchange,
-)
+from crypto_trade.exchange_api import Exchange
 
 
 class BinanceBase(Exchange):

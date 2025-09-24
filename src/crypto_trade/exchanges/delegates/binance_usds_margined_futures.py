@@ -1,7 +1,4 @@
-from crypto_trade.exchange_api import (
-    ApiMethod,
-    Ohlcv,
-)
+from crypto_trade.exchange_api import ApiMethod, Ohlcv
 from crypto_trade.exchanges.delegates.binance_futures_base import BinanceFuturesBase
 
 
@@ -50,7 +47,6 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
 
         self.rest_account_start_user_data_stream_path = "/fapi/v1/listenKey"
         self.rest_account_keepalive_user_data_stream_path = "/fapi/v1/listenKey"
-        self.rest_account_keepalive_user_data_stream_interval_seconds = 600
 
     def convert_websocket_push_data_for_ohlcv(self, *, json_deserialized_payload):
         symbol = json_deserialized_payload["s"]

@@ -3,6 +3,7 @@ import base64
 import hashlib
 import hmac
 from decimal import Decimal
+from typing import Optional
 
 from crypto_trade.exchange_api import (
     ApiMethod,
@@ -36,8 +37,9 @@ class BinanceFuturesBase(BinanceBase):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.rest_account_start_user_data_stream_path = None
-        self.rest_account_keepalive_user_data_stream_path = None
+        self.rest_account_start_user_data_stream_path: Optional[str] = None
+        self.rest_account_keepalive_user_data_stream_path: Optional[str] = None
+        self.rest_account_keepalive_user_data_stream_interval_seconds = 600
         self.websocket_account_system_event_listen_key_expired = "listenKeyExpired"
 
         self.order_status_mapping = {

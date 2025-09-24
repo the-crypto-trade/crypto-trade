@@ -454,7 +454,7 @@ class Order(BaseModel):
 
     @cached_property
     def average_filled_price_as_decimal(self):
-        return Decimal(self.cumulative_filled_quoteaverage_filled_price_quantity) if self.average_filled_price else None
+        return Decimal(self.average_filled_price) if self.average_filled_price else None
 
     @property
     def is_in_flight(self):
