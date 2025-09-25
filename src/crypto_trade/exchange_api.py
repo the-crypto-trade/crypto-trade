@@ -1254,13 +1254,18 @@ class Exchange(ExchangeApi):
             rest_request = next_rest_request_function(time_point=time_point_now())
             self.logger.fine("rest_request", rest_request)
 
+            raw_rest_response = None
+            raw_rest_response_text = None
             try:
                 async with await self.perform_rest_request(rest_request=rest_request, timeout_seconds=timeout_seconds) as client_response:
                     raw_rest_response = client_response
-                    rest_response = await self.rest_on_response(rest_request=rest_request, raw_rest_response=raw_rest_response)
+                    raw_rest_response_text = await raw_rest_response.text()
+                    rest_response = await self.rest_on_response(
+                        rest_request=rest_request, raw_rest_response=raw_rest_response, raw_rest_response_text=raw_rest_response_text
+                    )
                     self.logger.fine("rest_response", rest_response)
 
-                    if not rest_response or rest_response.next_rest_request_function is None:
+                    if rest_response.next_rest_request_function is None:
                         break
                     else:
                         next_rest_request_function = rest_response.next_rest_request_function
@@ -1268,6 +1273,12 @@ class Exchange(ExchangeApi):
 
             except Exception as exception:
                 self.logger.error(exception)
+
+                if raw_rest_response is not None:
+                    self.logger.trace("raw_rest_response.status", raw_rest_response.status)
+                    self.logger.trace("raw_rest_response.headers", raw_rest_response.headers)
+                    self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+
                 break
 
     async def perform_rest_request(self, *, rest_request, timeout_seconds=None):
@@ -1283,9 +1294,10 @@ class Exchange(ExchangeApi):
             timeout=aiohttp.ClientTimeout(sock_read=timeout_seconds),
         )
 
-    async def rest_on_response(self, *, rest_request, raw_rest_response):
-        raw_rest_response_text = await raw_rest_response.text()
+    async def rest_on_response(self, *, rest_request, raw_rest_response, raw_rest_response_text):
+        self.logger.trace("raw_rest_response.status", raw_rest_response.status)
         self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+        self.logger.trace("raw_rest_response.headers", raw_rest_response.headers)
         rest_response = RestResponse(
             rest_request=rest_request,
             status_code=raw_rest_response.status,
@@ -1838,6 +1850,8 @@ class Exchange(ExchangeApi):
                                     )
                                 except Exception as exception:
                                     self.logger.error(exception)
+                                    self.logger.info("websocket_connection", websocket_connection)
+                                    self.logger.info("raw_websocket_message.data", raw_websocket_message.data)
 
                             elif raw_websocket_message.type == aiohttp.WSMsgType.ERROR:
                                 break
