@@ -793,6 +793,7 @@ class BinanceFuturesBase(BinanceBase):
         ]
 
     def convert_websocket_push_data_for_trade(self, *, json_deserialized_payload):
+        print(json_deserialized_payload)
         symbol = json_deserialized_payload["s"]
 
         return [
