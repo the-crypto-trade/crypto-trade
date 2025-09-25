@@ -33,7 +33,7 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
             self.websocket_market_data_base_url = "wss://fstream.binancefuture.com"
         self.websocket_account_base_url = self.websocket_market_data_base_url
         self.websocket_market_data_path = "/stream"
-        self.websocket_market_data_channel_bbo = "ticker"
+        self.websocket_market_data_channel_bbo = "bookTicker"
         self.websocket_market_data_channel_trade = "trade"
         self.websocket_market_data_channel_ohlcv = "kline"
         self.websocket_account_path = "/ws/{listenKey}"
@@ -49,8 +49,9 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
         self.rest_account_keepalive_user_data_stream_path = "/fapi/v1/listenKey"
 
     def convert_websocket_push_data_for_ohlcv(self, *, json_deserialized_payload):
-        symbol = json_deserialized_payload["s"]
-        k = json_deserialized_payload["k"]
+        data = json_deserialized_payload["data"]
+        symbol = data["s"]
+        k = data["k"]
 
         return [
             Ohlcv(
@@ -62,8 +63,7 @@ class BinanceUsdsMarginedFutures(BinanceFuturesBase):
                 low_price=k["l"],
                 close_price=k["c"],
                 volume=k["v"],
-                base_volume=x["v"],
+                base_volume=k["v"],
                 quote_volume=k["q"],
             )
-            for x in json_deserialized_payload["data"]
         ]

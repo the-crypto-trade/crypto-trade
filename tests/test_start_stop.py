@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import asyncio
 import sys
@@ -62,6 +64,8 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
 
         await exchange.start()
 
+        await asyncio.sleep(1)
+
         await exchange.stop()
 
     except Exception:
@@ -88,7 +92,7 @@ def test_start_stop(exchange, exchange_instrument_type, symbol):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exchange", required=True)
-    parser.add_argument("--exchange_instrument_type", required=True)
+    parser.add_argument("--exchange-instrument-type", required=True)
     parser.add_argument("--symbol", required=True)
 
     args = parser.parse_args()

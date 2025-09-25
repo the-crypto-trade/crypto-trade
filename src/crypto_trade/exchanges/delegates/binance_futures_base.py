@@ -778,33 +778,34 @@ class BinanceFuturesBase(BinanceBase):
             await websocket_message.websocket_connection.close()
 
     def convert_websocket_push_data_for_bbo(self, *, json_deserialized_payload):
-        symbol = json_deserialized_payload["s"]
+        data = json_deserialized_payload["data"]
+        symbol = data["s"]
 
         return [
             Bbo(
                 api_method=ApiMethod.WEBSOCKET,
                 symbol=symbol,
-                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
-                best_bid_price=json_deserialized_payload["b"] if json_deserialized_payload.get("b") else None,
-                best_bid_size=json_deserialized_payload["B"] if json_deserialized_payload.get("B") else None,
-                best_ask_price=json_deserialized_payload["a"] if json_deserialized_payload.get("a") else None,
-                best_ask_size=json_deserialized_payload["A"] if json_deserialized_payload.get("A") else None,
+                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=data["T"]),
+                best_bid_price=data["b"] if data.get("b") else None,
+                best_bid_size=data["B"] if data.get("B") else None,
+                best_ask_price=data["a"] if data.get("a") else None,
+                best_ask_size=data["A"] if data.get("A") else None,
             )
         ]
 
     def convert_websocket_push_data_for_trade(self, *, json_deserialized_payload):
-        print(json_deserialized_payload)
-        symbol = json_deserialized_payload["s"]
+        data = json_deserialized_payload["data"]
+        symbol = data["s"]
 
         return [
             Trade(
                 api_method=ApiMethod.WEBSOCKET,
                 symbol=symbol,
-                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=json_deserialized_payload["T"]),
-                trade_id=str(json_deserialized_payload["t"]),
-                price=json_deserialized_payload["p"],
-                size=json_deserialized_payload["q"],
-                is_buyer_maker=json_deserialized_payload["m"],
+                exchange_update_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=data["T"]),
+                trade_id=str(data["t"]),
+                price=data["p"],
+                size=data["q"],
+                is_buyer_maker=data["m"],
             )
         ]
 
