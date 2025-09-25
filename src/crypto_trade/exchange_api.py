@@ -1275,9 +1275,9 @@ class Exchange(ExchangeApi):
                 self.logger.error(exception)
 
                 if raw_rest_response is not None:
-                    self.logger.trace("raw_rest_response.status", raw_rest_response.status)
-                    self.logger.trace("raw_rest_response.headers", raw_rest_response.headers)
-                    self.logger.trace("raw_rest_response_text", raw_rest_response_text)
+                    self.logger.warning("raw_rest_response.status", raw_rest_response.status)
+                    self.logger.warning("raw_rest_response.headers", raw_rest_response.headers)
+                    self.logger.warning("raw_rest_response_text", raw_rest_response_text)
 
                 break
 
@@ -1850,8 +1850,8 @@ class Exchange(ExchangeApi):
                                     )
                                 except Exception as exception:
                                     self.logger.error(exception)
-                                    self.logger.info("websocket_connection", websocket_connection)
-                                    self.logger.info("raw_websocket_message.data", raw_websocket_message.data)
+                                    self.logger.warning("websocket_connection", websocket_connection)
+                                    self.logger.warning("raw_websocket_message.data", raw_websocket_message.data)
 
                             elif raw_websocket_message.type == aiohttp.WSMsgType.ERROR:
                                 break
