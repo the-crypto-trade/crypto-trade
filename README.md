@@ -115,4 +115,4 @@ pprint.pp(exchange.balances)
 ### Spot Market Making
 * Source code: [applications/market_making.py](applications/market_making.py)
 * Configuration: see the beginning of the source code for environment variables and command line arguments.
-* Quick start: `env PYTHONPATH=src API_KEY=... API_SECRET=... python3 applications/market_making.py --exchange-name bybit --base-assets BTC --quote-asset USDT`
+* Quick start: `env API_KEY=... API_SECRET=... python3 applications/market_making.py --exchange-name bybit --base-assets BTC --quote-asset USDT`
