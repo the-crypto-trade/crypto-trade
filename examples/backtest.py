@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # This example does not use any components of our library.
 # It simply illustrates how straightforward it is to implement a fast backtest script from scratch.
 

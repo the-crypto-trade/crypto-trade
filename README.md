@@ -26,6 +26,7 @@
 * Unified API for different exchanges.
 * Super simple to use. Your code will be in a linear and synchronous manner. The library takes care of asynchronous networking.
 * Supported exchanges:
+  * [Binance](https://accounts.maxweb.black/register?ref=1116718520)
   * [Bybit](https://www.bybit.com/invite?ref=XNYP2K).
   * [Okx](https://www.okx.com/join/47636709).
   * Many more coming soon.
@@ -98,6 +99,7 @@ pprint.pp(exchange.balances)
 
 ## Paper Trading
 * When `is_paper_trading` is set to `True`, trading will be performed in a testing environment. See below for details.
+* For [Binance](https://accounts.maxweb.black/register?ref=1116718520), its testnet environment will be used: https://testnet.binance.vision and https://testnet.binancefuture.com.
 * For [Bybit](https://www.bybit.com/invite?ref=XNYP2K), its testnet environment will be used: https://testnet.bybit.com.
 * For [Okx](https://www.okx.com/join/47636709), its demo trading environment will be used: https://www.okx.com/en-us/help/how-to-use-demo-trading.
 

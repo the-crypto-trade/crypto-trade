@@ -925,15 +925,11 @@ class Okx(Exchange):
             low_price=input[3],
             close_price=input[4],
             volume=input[5],
+            base_volume=input[5] if self.instrument_type in (OkxInstrumentType.SPOT, OkxInstrumentType.MARGIN) else input[6],
             quote_volume=input[7],
         )
 
     def convert_dict_to_order(self, *, input, api_method, symbol):
-        contract_size = 1
-
-        if symbol in self.all_instrument_information and self.all_instrument_information[symbol].contract_size_as_decimal:
-            contract_size = self.all_instrument_information[symbol].contract_size_as_decimal
-
         return Order(
             api_method=api_method,
             symbol=symbol,
@@ -951,7 +947,7 @@ class Okx(Exchange):
             margin_type=MarginType[input["tdMode"].upper()] if input["tdMode"] != "cash" else None,
             margin_asset=input["ccy"],
             cumulative_filled_quantity=input["accFillSz"] or None,
-            cumulative_filled_quote_quantity="{0:f}".format(Decimal(input["avgPx"]) * Decimal(input["accFillSz"]) * contract_size) if input["avgPx"] else None,
+            average_filled_price=input["avgPx"] if input["avgPx"] else None,
             exchange_create_time_point=convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=input["cTime"]),
             status=self.order_status_mapping.get(input["state"]),
         )
@@ -959,7 +955,7 @@ class Okx(Exchange):
     def convert_dict_to_fill(self, *, input, api_method, symbol):
         fill_fee = input.get("fillFee", input.get("fee"))
         fill_fee_ccy = input.get("fillFeeCcy", input.get("feeCcy"))
-        is_fee_rebate = not fill_fee.startswith("-") if fill_fee else None
+        is_fee_rebate = not fill_fee.startswith("-") if fill_fee and not Decimal(fill_fee).is_zero() else None
 
         return Fill(
             api_method=api_method,
@@ -983,25 +979,26 @@ class Okx(Exchange):
         symbol = input["instId"]
         is_long = None
 
-        if pos_side == "long":
-            is_long = True
-        elif pos_side == "short":
-            is_long = False
-        else:
-            if (
-                self.instrument_type == OkxInstrumentType.FUTURES
-                or self.instrument_type == OkxInstrumentType.SWAP
-                or self.instrument_type == OkxInstrumentType.OPTION
-            ):
-                is_long = not pos.startswith("-")
-            elif self.instrument_type == OkxInstrumentType.MARGIN:
-                if symbol in self.all_instrument_information:
-                    instrument_information_for_symbol = self.all_instrument_information[symbol]
-                    pos_ccy = input["posCcy"]
-                    if pos_ccy == instrument_information_for_symbol.base_asset:
-                        is_long = True
-                    elif pos_ccy == instrument_information_for_symbol.quote_asset:
-                        is_long = False
+        if not Decimal(pos).is_zero():
+            if pos_side == "long":
+                is_long = True
+            elif pos_side == "short":
+                is_long = False
+            else:
+                if (
+                    self.instrument_type == OkxInstrumentType.FUTURES
+                    or self.instrument_type == OkxInstrumentType.SWAP
+                    or self.instrument_type == OkxInstrumentType.OPTION
+                ):
+                    is_long = not pos.startswith("-")
+                elif self.instrument_type == OkxInstrumentType.MARGIN:
+                    if symbol in self.all_instrument_information:
+                        instrument_information_for_symbol = self.all_instrument_information[symbol]
+                        pos_ccy = input["posCcy"]
+                        if pos_ccy == instrument_information_for_symbol.base_asset:
+                            is_long = True
+                        elif pos_ccy == instrument_information_for_symbol.quote_asset:
+                            is_long = False
 
         return Position(
             margin_type=MarginType[input["mgnMode"].upper()],

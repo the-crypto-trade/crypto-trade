@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
+
 import asyncio
 import os
 import pprint
 import sys
-import time
 import traceback
 
 from crypto_trade.exchange_api import ApiMethod, Order
@@ -23,8 +24,8 @@ async def main():
             subscribe_order=True,
             subscribe_balance=True,
             is_paper_trading=False,  # https://www.bybit.com/en/help-center/article/How-to-Request-Test-Coins-on-Testnet
-            api_key=os.getenv("BYBIT_API_KEY", ""),
-            api_secret=os.getenv("BYBIT_API_SECRET", ""),
+            api_key=os.getenv("API_KEY", ""),
+            api_secret=os.getenv("API_SECRET", ""),
             logger=logger,
             start_wait_seconds=float(os.getenv("START_WAIT_SECONDS", "1")),  # increase this value if connecting through a slow VPN
             trade_api_method_preference=ApiMethod.REST,  # allowed values are ApiMethod.REST and ApiMethod.WEBSOCKET
@@ -46,7 +47,7 @@ async def main():
         await exchange.create_order(
             order=Order(
                 symbol=symbol,
-                client_order_id=str(int(time.time() * 1000)),
+                client_order_id=exchange.generate_next_client_order_id(),
                 is_buy=os.getenv("SIDE", "BUY") == "BUY",
                 price=exchange.bbos[symbol].best_ask_price,
                 quantity="0.001",

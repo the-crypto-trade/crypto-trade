@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import asyncio
 import sys
@@ -5,6 +7,7 @@ import traceback
 
 import pytest
 
+from crypto_trade.exchanges.binance import Binance, BinanceInstrumentType
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 
@@ -21,6 +24,7 @@ async def main(instrument):
         instrument_type = {
             "okx": OkxInstrumentType,
             "bybit": BybitInstrumentType,
+            "binance": BinanceInstrumentType,
         }[
             exchange_name
         ][instrument_type_str.upper()]
@@ -28,6 +32,7 @@ async def main(instrument):
         exchange_class = {
             "okx": Okx,
             "bybit": Bybit,
+            "binance": Binance,
         }[exchange_name]
 
         exchange = exchange_class(

@@ -3,7 +3,6 @@ import pprint
 import sys
 import time
 import traceback
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from enum import IntEnum
@@ -314,7 +313,7 @@ class RestRequest:
         self.path = path
         self.query_params = query_params
         if query_params:
-            self.query_string = "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted(dict(query_params).items())])
+            self.query_string = "&".join([f"{k}={v}" for k, v in sorted(dict(query_params).items())])
         else:
             self.query_string = query_string
         self.headers = headers
@@ -532,7 +531,7 @@ def create_url(*, base_url, path):
 
 def create_path_with_query_params(*, path, query_params):
     if query_params:
-        return "?".join((path, "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted(dict(query_params).items())])))
+        return "?".join((path, "&".join([f"{k}={v}" for k, v in sorted(dict(query_params).items())])))
     else:
         return path
 

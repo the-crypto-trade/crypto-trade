@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import asyncio
 import sys
@@ -5,6 +7,7 @@ import traceback
 
 import pytest
 
+from crypto_trade.exchanges.binance import Binance, BinanceInstrumentType
 from crypto_trade.exchanges.bybit import Bybit, BybitInstrumentType
 from crypto_trade.exchanges.okx import Okx, OkxInstrumentType
 from crypto_trade.utility import unix_timestamp_seconds_now
@@ -12,12 +15,10 @@ from crypto_trade.utility import unix_timestamp_seconds_now
 EXCHANGE_CLASSES = {
     "Bybit": Bybit,
     "Okx": Okx,
+    "Binance": Binance,
 }
 
-EXCHANGE_INSTRUMENT_TYPES = {
-    "Bybit": BybitInstrumentType,
-    "Okx": OkxInstrumentType,
-}
+EXCHANGE_INSTRUMENT_TYPES = {"Bybit": BybitInstrumentType, "Okx": OkxInstrumentType, "Binance": BinanceInstrumentType}
 
 
 async def main(exchange_name, exchange_instrument_type_name, symbol):
@@ -34,7 +35,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
         try:
             instrument_type_enum = enum_class[exchange_instrument_type_name.upper()]
         except KeyError:
-            raise ValueError(f"Invalid instrument type '{exchange_instrument_type_name}' for {exchange_name}")
+            raise ValueError(f"Unsupported instrument type '{exchange_instrument_type_name}' for {exchange_name}")
 
         now_unix_timestamp_seconds = unix_timestamp_seconds_now()
         exchange = exchange_class(
@@ -63,6 +64,8 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
 
         await exchange.start()
 
+        await asyncio.sleep(1)
+
         await exchange.stop()
 
     except Exception:
@@ -79,6 +82,7 @@ async def main(exchange_name, exchange_instrument_type_name, symbol):
         ("Bybit", "SPOT", "BTCUSDT"),
         ("Bybit", "LINEAR", "BTCUSDT"),
         ("Bybit", "INVERSE", "BTCUSD"),
+        ("Binance", "USDS_MARGINED_FUTURES", "BTCUSDT"),
     ],
 )
 def test_start_stop(exchange, exchange_instrument_type, symbol):
@@ -88,7 +92,7 @@ def test_start_stop(exchange, exchange_instrument_type, symbol):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exchange", required=True)
-    parser.add_argument("--exchange_instrument_type", required=True)
+    parser.add_argument("--exchange-instrument-type", required=True)
     parser.add_argument("--symbol", required=True)
 
     args = parser.parse_args()
