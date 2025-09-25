@@ -1272,13 +1272,12 @@ class Exchange(ExchangeApi):
                         next_rest_request_delay_seconds = rest_response.next_rest_request_delay_seconds
 
             except Exception as exception:
-                self.logger.error(exception)
-
                 if raw_rest_response is not None:
                     self.logger.warning("raw_rest_response.status", raw_rest_response.status)
                     self.logger.warning("raw_rest_response.headers", raw_rest_response.headers)
                     self.logger.warning("raw_rest_response_text", raw_rest_response_text)
 
+                self.logger.error(exception)
                 break
 
     async def perform_rest_request(self, *, rest_request, timeout_seconds=None):
@@ -1849,9 +1848,9 @@ class Exchange(ExchangeApi):
                                         websocket_connection=websocket_connection, raw_websocket_message_data=raw_websocket_message.data
                                     )
                                 except Exception as exception:
-                                    self.logger.error(exception)
                                     self.logger.warning("websocket_connection", websocket_connection)
                                     self.logger.warning("raw_websocket_message.data", raw_websocket_message.data)
+                                    self.logger.error(exception)
 
                             elif raw_websocket_message.type == aiohttp.WSMsgType.ERROR:
                                 break
