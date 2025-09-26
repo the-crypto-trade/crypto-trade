@@ -7,12 +7,11 @@ except ImportError:
 
 import asyncio
 import dataclasses
-import functools
 import ssl
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import IntEnum
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 import aiohttp
@@ -839,14 +838,14 @@ class Exchange(ExchangeApi):
         else:
             import json
 
-            self.json_serialize = json.dumps
+            self.json_serialize = partial(json.dumps, separators=(",", ":"))
 
         if json_deserialize:
             self.json_deserialize = json_deserialize
         else:
             import json
 
-            self.json_deserialize = functools.partial(json.loads)
+            self.json_deserialize = json.loads
 
         self.rest_market_data_base_url: Optional[str] = None
         self.rest_account_base_url: Optional[str] = None
