@@ -4,7 +4,8 @@ dynamic = ["version"]
 dependencies = [
     "aiohttp[speedups] ~= 3.10",
     "StrEnum ~= 0.4 ; python_version < '3.11'",
-    "cryptography ~= 46.0"
+    "cryptography ~= 46.0",
+    "hyperliquid-python-sdk ~= 0.19",
 ]
 requires-python = ">= 3.10"
 readme = "README.md"
