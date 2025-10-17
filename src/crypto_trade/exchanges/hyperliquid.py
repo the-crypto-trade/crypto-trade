@@ -35,6 +35,7 @@ from crypto_trade.utility import (
     normalize_decimal_string,
     remove_leading_negative_sign_in_string,
     time_point_now,
+    convert_num_decimals_to_string,
 )
 
 
@@ -118,11 +119,15 @@ class Hyperliquid(Exchange):
             'Content-Type':'application/json',
         }
 
-        self.spot_base_asset_to_index = {}
+        self.spot_base_asset_to_index_mapping = {}
+        self.spot_index_to_base_asset_mapping = {}
 
         self.account_address = '0x0000000000000000000000000000000000000000'
         if self.api_key:
             self.account_address = eth_account.Account.from_key(self.api_key).address
+
+        self.spot_quote_asset = "USDC"
+        self.perp_quote_asset = "USDT"
 
     def is_instrument_type_valid(self, *, instrument_type):
         return instrument_type in (
@@ -141,7 +146,7 @@ class Hyperliquid(Exchange):
     def convert_symbol_to_coin(self, *, symbol):
         base_asset = symbol.split('-')[0]
         if self.instrument_type == HyperliquidInstrumentType.SPOT:
-            return f'@{self.spot_base_asset_to_index[base_asset]}'
+            return f'@{self.spot_base_asset_to_index_mapping[base_asset]}'
         else:
             return base_asset
 
@@ -293,28 +298,46 @@ class Hyperliquid(Exchange):
     def convert_rest_response_for_all_instrument_information(self, *, json_deserialized_payload, rest_request):
         result = []
 
-        for x in json_deserialized_payload["data"]:
-            inst_family = x["instFamily"]
-            inst_family_has_dash = "-" in inst_family
-            result.append(
-                InstrumentInformation(
-                    api_method=ApiMethod.REST,
-                    symbol=x["instId"],
-                    base_asset=x["baseCcy"] if x["baseCcy"] else (x["instFamily"].split("-")[0] if inst_family_has_dash else None),
-                    quote_asset=x["quoteCcy"] if x["quoteCcy"] else (x["instFamily"].split("-")[1] if inst_family_has_dash else None),
-                    order_price_increment=normalize_decimal_string(input=x["tickSz"]),
-                    order_quantity_increment=normalize_decimal_string(input=x["lotSz"]),
-                    order_quantity_min=normalize_decimal_string(input=x["minSz"]),
-                    order_quantity_max=normalize_decimal_string(input=x["maxLmtSz"]),
-                    order_quote_quantity_max=normalize_decimal_string(input=x["maxLmtAmt"]),
-                    margin_asset=x["settleCcy"],
-                    underlying_symbol=x["uly"],
-                    contract_size=normalize_decimal_string(input=x["ctVal"]),
-                    contract_multiplier=normalize_decimal_string(input=x["ctMult"]),
-                    expiry_time=int(expTime) // 1000 if (expTime := x["expTime"]) else None,
-                    is_open_for_trade=x["state"] in ("live", "preopen"),
+        if self.instrument_type == HyperliquidInstrumentType.SPOT:
+            sz_decimals_by_index = {}
+            for x in json_deserialized_payload["tokens"]:
+                sz_decimals_by_index[x['index']] = x['szDecimals']
+                name = x['name']
+                index = x['index']
+                self.spot_base_asset_to_index_mapping[name] = index
+                self.spot_index_to_base_asset_mapping[index] = name
+
+            for x in json_deserialized_payload["universe"]:
+                index = x['index']
+                base_asset = self.spot_index_to_base_asset_mapping[index]
+                increment_str = convert_num_decimals_to_string(sz_decimals_by_index[index])
+                result.append(
+                    InstrumentInformation(
+                        api_method=ApiMethod.REST,
+                        symbol=f'{base_asset}-SPOT',
+                        base_asset=base_asset,
+                        quote_asset=self.spot_quote_asset,
+                        order_price_increment=increment_str,
+                        order_quantity_increment=increment_str,
+                        order_quantity_min=increment_str,
+                    )
                 )
-            )
+        else:
+            for x in json_deserialized_payload["universe"]:
+                name = x['name']
+                sz_decimals = x['szDecimals']
+                increment_str = convert_num_decimals_to_string(sz_decimals)
+                result.append(
+                    InstrumentInformation(
+                        api_method=ApiMethod.REST,
+                        symbol=f'{name}-PERP',
+                        base_asset=name,
+                        quote_asset=self.perp_quote_asset,
+                        order_price_increment=increment_str,
+                        order_quantity_increment=increment_str,
+                        order_quantity_min=increment_str,
+                    )
+                )
 
         return result
 
@@ -335,63 +358,6 @@ class Hyperliquid(Exchange):
 
     def convert_rest_response_for_historical_trade(self, *, json_deserialized_payload, rest_request):
         return [self.convert_dict_to_trade(input=x, api_method=ApiMethod.REST, symbol=x["instId"]) for x in json_deserialized_payload["data"]]
-
-    def convert_rest_response_for_historical_trade_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
-        data = json_deserialized_payload["data"]
-
-        if data:
-            head = data[0]
-            head_exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=head["ts"])
-            head_trade_id_as_int = int(head["tradeId"])
-            tail = data[-1]
-            tail_exchange_update_time_point = convert_unix_timestamp_milliseconds_to_time_point(unix_timestamp_milliseconds=tail["ts"])
-            tail_trade_id_as_int = int(tail["tradeId"])
-
-            if (head_exchange_update_time_point, head_trade_id_as_int) < (tail_exchange_update_time_point, tail_trade_id_as_int):
-                after = head_trade_id_as_int
-                exchange_update_time_point = head_exchange_update_time_point
-            else:
-                after = tail_trade_id_as_int
-
-                exchange_update_time_point = tail_exchange_update_time_point
-            if (
-                self.fetch_historical_trade_start_unix_timestamp_seconds is None
-                or exchange_update_time_point[0] >= self.fetch_historical_trade_start_unix_timestamp_seconds
-            ):
-                return self.rest_market_data_create_post_request_function(
-                    path=self.rest_market_data_fetch_historical_trade_path,
-                    query_params={"instId": head["instId"], "type": 1, "after": after, "limit": self.rest_market_data_fetch_historical_trade_limit},
-                )
-
-    def convert_rest_response_for_historical_ohlcv(self, *, json_deserialized_payload, rest_request):
-        inst_id = rest_request.query_params["instId"]
-
-        return [self.convert_dict_to_ohlcv(input=x, api_method=ApiMethod.REST, symbol=inst_id) for x in json_deserialized_payload["data"]]
-
-    def convert_rest_response_for_historical_ohlcv_to_next_rest_request_function(self, *, json_deserialized_payload, rest_request):
-        data = json_deserialized_payload["data"]
-
-        if data:
-            head = data[0]
-            head_ts = int(head[0])
-            tail = data[-1]
-            tail_ts = int(tail[0])
-
-            if head_ts < tail_ts:
-                after = head_ts
-            else:
-                after = tail_ts
-
-            if self.fetch_historical_ohlcv_start_unix_timestamp_seconds is None or after // 1000 >= self.fetch_historical_ohlcv_start_unix_timestamp_seconds:
-                return self.rest_market_data_create_post_request_function(
-                    path=self.rest_market_data_fetch_historical_ohlcv_path,
-                    query_params={
-                        "instId": rest_request.query_params["instId"],
-                        "after": after,
-                        "bar": self.convert_ohlcv_interval_seconds_to_string(ohlcv_interval_seconds=self.ohlcv_interval_seconds),
-                        "limit": self.rest_market_data_fetch_historical_ohlcv_limit,
-                    },
-                )
 
     def convert_rest_response_for_create_order(self, *, json_deserialized_payload, rest_request):
         x = json_deserialized_payload["data"][0]

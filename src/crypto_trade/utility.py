@@ -568,3 +568,8 @@ def convert_decimal_to_string(*, input, normalize=False):
 
 def convert_datetime_string_from_colon_to_hyphen(*, input):
     return input.replace(":", "-")
+
+def convert_num_decimals_to_string(*, input):
+    if input == 0:
+        return "1"
+    return "0." + "0" * (input - 1) + "1"
