@@ -5,7 +5,8 @@ import hmac
 from datetime import datetime, timezone
 from decimal import Decimal
 from hyperliquid.utils.signing import sign_l1_action
-
+import eth_account
+from eth_account.signers.local import LocalAccount
 try:
     from enum import StrEnum
 except ImportError:
@@ -119,6 +120,10 @@ class Hyperliquid(Exchange):
 
         self.spot_base_asset_to_index = {}
 
+        self.account_address = '0x0000000000000000000000000000000000000000'
+        if self.api_key:
+            self.account_address = eth_account.Account.from_key(self.api_key).address
+
     def is_instrument_type_valid(self, *, instrument_type):
         return instrument_type in (
             HyperliquidInstrumentType.SPOT,
@@ -181,86 +186,109 @@ class Hyperliquid(Exchange):
         )
 
     def rest_account_fetch_order_create_rest_request_function(self, *, symbol, order_id=None, client_order_id=None):
-        query_params = {"instId": symbol}
-        if order_id:
-            query_params["ordId"] = order_id
-        else:
-            query_params["clOrdId"] = client_order_id
-        return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_order_path, query_params=query_params)
+        return self.rest_account_create_post_request_function(
+            path=self.rest_account_fetch_bbo_path,
+            json_payload={
+                'type':'orderStatus',
+                'user':self.account_address,
+                'oid':int(order_id) or client_order_id,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
+        )
 
     def rest_account_fetch_open_order_create_rest_request_function(self):
-        return self.rest_account_create_get_request_function_with_signature(
-            path=self.rest_account_fetch_open_order_path, query_params={"instType": f"{self.instrument_type}"}
+        return self.rest_accountcreate_post_request_function(
+            path=self.rest_account_fetch_open_order_path,
+            json_payload={
+                'type':'openOrders',
+                'user':self.account_address,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
         )
 
     def rest_account_fetch_position_create_rest_request_function(self):
-        return self.rest_account_create_get_request_function_with_signature(
-            path=self.rest_account_fetch_position_path, query_params={"instType": f"{self.instrument_type}"}
+        return self.rest_accountcreate_post_request_function(
+            path=self.rest_account_fetch_position_path,
+            json_payload={
+                'type':'clearinghouseState',
+                'user':self.account_address,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
         )
 
     def rest_account_fetch_balance_create_rest_request_function(self):
-        return self.rest_account_create_get_request_function_with_signature(path=self.rest_account_fetch_balance_path)
+        return self.rest_accountcreate_post_request_function(
+            path=self.rest_account_fetch_position_path,
+            json_payload={
+                'type':'spotClearinghouseState' if self.instrument_type == HyperliquidInstrumentType.SPOT else 'clearinghouseState',
+                'user':self.account_address,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
+        )
 
     def rest_account_fetch_historical_order_create_rest_request_function(self, *, symbol):
-        return self.rest_account_create_get_request_function_with_signature(
-            path=self.rest_account_fetch_historical_order_path,
-             "instId": symbol, "limit": self.rest_account_fetch_historical_order_limit},
+        return self.rest_accountcreate_post_request_function(
+            path=self.rest_account_fetch_position_path,
+            json_payload={
+                'type':'historicalOrders',
+                'user':self.account_address,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
         )
 
     def rest_account_fetch_historical_fill_create_rest_request_function(self, *, symbol):
-        return self.rest_account_create_get_request_function_with_signature(
-            path=self.rest_account_fetch_historical_fill_path,
-             "instId": symbol, "limit": self.rest_account_fetch_historical_fill_limit},
+        return self.rest_accountcreate_post_request_function(
+            path=self.rest_account_fetch_position_path,
+            json_payload={
+                'type':'userFills',
+                'user':self.account_address,
+            },
+            json_serialize=self.json_serialize,
+            headers=self.rest_request_headers,
         )
 
     def is_rest_response_success(self, *, rest_response):
+        has_error = rest_response.json_deserialized_payload and 'response' in rest_response.json_deserialized_payload and 'data' in rest_response.json_deserialized_payload['response'] and 'statuses' in rest_response.json_deserialized_payload['response']['data'] \
+        and any("error" in x for x in rest_response.json_deserialized_payload['response']['data']['statuses'])
         return (
             super().is_rest_response_success(rest_response=rest_response)
-            and rest_response.json_deserialized_payload
-            and rest_response.json_deserialized_payload["code"] == "0"
+            and not has_error
         )
 
     def is_rest_response_for_all_instrument_information(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_market_data_fetch_all_instrument_information_path
+        return rest_response.rest_request.json_payload.get('type') == ('spotMeta' if self.instrument_type==HyperliquidInstrumentType.SPOT else 'meta')
 
     def is_rest_response_for_bbo(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_market_data_fetch_bbo_path
-
-    def is_rest_response_for_historical_trade(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_market_data_fetch_historical_trade_path
-
-    def is_rest_response_for_historical_ohlcv(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_market_data_fetch_historical_ohlcv_path
+        return rest_response.rest_request.json_payload.get('type') == 'l2Book'
 
     def is_rest_response_for_create_order(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_create_order_path and rest_response.rest_request.method == RestRequest.METHOD_POST
+        return rest_response.rest_request.json_payload.get('action', {}).get('type') == 'order'
 
     def is_rest_response_for_cancel_order(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_cancel_order_path
+        return rest_response.rest_request.json_payload.get('action', {}).get('type') == 'cancel'
 
     def is_rest_response_for_fetch_order(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_fetch_order_path and rest_response.rest_request.method == RestRequest.METHOD_GET
+        return rest_response.rest_request.json_payload.get('type') == 'orderStatus'
 
     def is_rest_response_for_fetch_open_order(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_fetch_open_order_path
+        return rest_response.rest_request.json_payload.get('type') == 'openOrders'
 
     def is_rest_response_for_fetch_position(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_fetch_position_path
+        return rest_response.rest_request.json_payload.get('type') == 'clearinghouseState'
 
     def is_rest_response_for_fetch_balance(self, *, rest_response):
-        return rest_response.rest_request.path == self.rest_account_fetch_balance_path
+        return rest_response.rest_request.json_payload.get('type') == ('spotClearinghouseState' if self.instrument_type == HyperliquidInstrumentType.SPOT else 'clearinghouseState')
 
     def is_rest_response_for_historical_order(self, *, rest_response):
-        return (
-            rest_response.rest_request.path == self.rest_account_fetch_historical_order_path
-            or rest_response.rest_request.path == self.rest_account_fetch_historical_order_path_2
-        )
+        return rest_response.rest_request.json_payload.get('type') == 'historicalOrders'
 
     def is_rest_response_for_historical_fill(self, *, rest_response):
-        return (
-            rest_response.rest_request.path == self.rest_account_fetch_historical_fill_path
-            or rest_response.rest_request.path == self.rest_account_fetch_historical_fill_path_2
-        )
+        return rest_response.rest_request.json_payload.get('type') == 'userFills'
 
     def convert_rest_response_for_all_instrument_information(self, *, json_deserialized_payload, rest_request):
         result = []
