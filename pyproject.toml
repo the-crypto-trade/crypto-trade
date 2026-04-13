@@ -2,7 +2,7 @@
 name = "crypto-trade"
 dynamic = ["version"]
 dependencies = [
-    "aiohttp[speedups] ~= 3.10",
+    "aiohttp[speedups] ~= 3.13",
     "StrEnum ~= 0.4 ; python_version < '3.11'",
     "cryptography ~= 46.0"
 ]
