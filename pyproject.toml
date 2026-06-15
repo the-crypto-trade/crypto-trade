@@ -4,7 +4,7 @@ dynamic = ["version"]
 dependencies = [
     "aiohttp[speedups] ~= 3.13",
     "StrEnum ~= 0.4 ; python_version < '3.11'",
-    "cryptography ~= 47.0"
+    "cryptography ~= 49.0"
 ]
 requires-python = ">= 3.10"
 readme = "README.md"
